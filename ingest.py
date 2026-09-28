@@ -1,53 +1,77 @@
-# Ingestion pipeline: load docs -> chunk -> embed -> insert into pgvector.
-# Write your attempt below.
+"""Ingestion pipeline: load docs -> chunk -> embed -> insert into pgvector.
+
+    python ingest.py                         # re-index the bundled notes/ folder
+    python ingest.py path/to/notes --append  # add another folder (e.g. official docs) on top
+"""
+import argparse
 from pathlib import Path
-from sentence_transformers import SentenceTransformer
-import psycopg2
-from pgvector.psycopg2 import register_vector
+
+DEFAULT_FOLDER = Path(__file__).parent / "notes"
+EXTENSIONS = (".md", ".txt", ".rst")
 
 
-def load_documents(folder_path) -> list[tuple[str , str]]:
-    docs = Path(folder_path).glob("*.md")
+def load_documents(folder_path, recursive: bool = True) -> list[tuple[str, str]]:
+    folder = Path(folder_path)
+    paths = folder.rglob("*") if recursive else folder.glob("*")
     material = []
-    for obj in docs:
-        material.append((obj.name , obj.read_text(encoding="utf-8")))
+    for obj in sorted(paths):
+        if obj.is_file() and obj.suffix.lower() in EXTENSIONS:
+            material.append((str(obj.relative_to(folder)).replace("\\", "/"), obj.read_text(encoding="utf-8")))
     return material
 
 
 def chunk_text(text: str, chunk_size: int = 200, overlap: int = 50) -> list[str]:
-    '''Behavior: split text into words (text.split()), then slide a window of chunk_size words
-    across them, advancing by chunk_size - overlap words each step (that's what creates the 
-    overlap — you're re-including the last overlap words of the previous window at the start of
-    the next one). Join each window's words back into a string, collect all windows into a list, return it.'''
+    '''Split text into words, then slide a window of chunk_size words across them, advancing
+    by chunk_size - overlap words each step (re-including the last `overlap` words of the
+    previous window). Stops once a window reaches the end, so no chunk is a pure subset of
+    the one before it.'''
+    if overlap >= chunk_size:
+        raise ValueError("overlap must be smaller than chunk_size")
 
     words = text.split()
     chunks = []
     step = chunk_size - overlap
-    for i in range(0 , len(words) , step):
-        chunk = ' '.join(words[i:i+chunk_size])
-        chunks.append(chunk)
+    for i in range(0, len(words), step):
+        chunks.append(' '.join(words[i:i + chunk_size]))
+        if i + chunk_size >= len(words):
+            break
     return chunks
 
 
-if __name__ == "__main__":
-    docs = load_documents(r"D:\Placement_Prep\DSA")
-    conn = psycopg2.connect(host="localhost", port=5432, dbname="rag_db", user="rag", password="rag_dev_pw")
-    register_vector(conn)
+def ingest(docs: list[tuple[str, str]], append: bool = False, chunk_size: int = 200, overlap: int = 50) -> int:
+    import db
+    import embed
+
+    db.init_schema()
+    conn = db.connect()
     cur = conn.cursor()
-    document_chunks = []
-    model = SentenceTransformer('all-MiniLM-L6-v2')
+    if not append:
+        cur.execute("TRUNCATE document_chunks RESTART IDENTITY;")
 
-    cur.execute("TRUNCATE document_chunks RESTART IDENTITY;")
-
-    for obj in docs:
-        doc_chunk = chunk_text(obj[1] , 200 , 50)
-        embedding = model.encode(doc_chunk)
-
-        for doc , embed in zip(doc_chunk , embedding):
-            cur.execute("INSERT INTO document_chunks (source, content, embedding) VALUES (%s, %s, %s)", (obj[0], doc, embed))
+    total = 0
+    for source, text in docs:
+        doc_chunks = chunk_text(text, chunk_size, overlap)
+        if not doc_chunks:
+            continue
+        cur.execute("DELETE FROM document_chunks WHERE source = %s", (source,))
+        for chunk, vector in zip(doc_chunks, embed.encode(doc_chunks), strict=True):
+            cur.execute("INSERT INTO document_chunks (source, content, embedding) VALUES (%s, %s, %s)",
+                        (source, chunk, vector))
+        total += len(doc_chunks)
 
     conn.commit()
     conn.close()
+    return total
 
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("folder", nargs="?", default=DEFAULT_FOLDER, help="folder of .md/.txt/.rst files")
+    parser.add_argument("--append", action="store_true", help="keep existing chunks instead of truncating")
+    parser.add_argument("--chunk-size", type=int, default=200)
+    parser.add_argument("--overlap", type=int, default=50)
+    args = parser.parse_args()
 
+    documents = load_documents(args.folder)
+    count = ingest(documents, append=args.append, chunk_size=args.chunk_size, overlap=args.overlap)
+    print(f"Indexed {count} chunks from {len(documents)} documents in {args.folder}.")
