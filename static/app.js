@@ -230,6 +230,7 @@
   }
 
   function friendlyError(msg) {
+    if (/POSTGRES_PASSWORD/.test(msg)) return `The database password isn't configured — set <code>POSTGRES_PASSWORD</code> in <code>.env</code> and restart the server.`;
     if (/GROQ_API_KEY/.test(msg)) return `The LLM isn't configured yet — add your <code>GROQ_API_KEY</code> to <code>.env</code> and restart the server.`;
     if (/connect|Connection refused|could not connect|timeout/i.test(msg))
       return `Couldn't reach one of the databases. Is <code>docker compose up -d</code> running? <br><small>${esc(msg)}</small>`;

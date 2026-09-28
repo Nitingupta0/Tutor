@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS problems (
 
 
 def connect():
+    if not config.POSTGRES_PASSWORD:
+        raise RuntimeError("POSTGRES_PASSWORD is not set — copy .env.example to .env and choose a password.")
     conn = psycopg2.connect(
         host=config.POSTGRES_HOST,
         port=config.POSTGRES_PORT,

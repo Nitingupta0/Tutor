@@ -3,11 +3,11 @@ services:
     image: ankane/pgvector:latest
     container_name: rag_postgres
     environment:
-      POSTGRES_USER: rag
-      POSTGRES_PASSWORD: rag_dev_pw
-      POSTGRES_DB: rag_db
+      POSTGRES_USER: ${POSTGRES_USER:-rag}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-rag_db}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 
@@ -15,13 +15,13 @@ services:
     image: redis:alpine
     container_name: rag_redis
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
 
   mongo:
     image: mongo:latest
     container_name: rag_mongo
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongodata:/data/db
 

@@ -9,7 +9,7 @@ POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
 POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
 POSTGRES_DB = os.getenv("POSTGRES_DB", "rag_db")
 POSTGRES_USER = os.getenv("POSTGRES_USER", "rag")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "rag_dev_pw")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")  # required — set it in .env, never in code
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 CACHE_TTL_SECONDS = int(os.getenv("CACHE_TTL_SECONDS", "3600"))

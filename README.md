@@ -88,7 +88,7 @@ python -m venv venv
 venv\Scripts\activate        # Windows — use `source venv/bin/activate` on macOS/Linux
 pip install -r requirements.txt
 
-cp .env.example .env         # then paste in your own GROQ_API_KEY (https://console.groq.com)
+cp .env.example .env         # then add your GROQ_API_KEY (https://console.groq.com) and pick a POSTGRES_PASSWORD
 
 docker compose up -d         # Postgres+pgvector, Redis, MongoDB
 
