@@ -166,29 +166,13 @@
     return { wrap, card, head, stages, content, setStage };
   }
 
-  function renderSources(ui, sources) {
-    if (!sources?.length) return;
-    const box = el("div", "sources");
-    box.appendChild(el("div", "sources-title", `<span>Grounded in ${sources.length} passage${sources.length > 1 ? "s" : ""}</span><span>pgvector · cosine</span>`));
-    const list = el("div", "source-list");
-    let preview = null;
-    sources.forEach(([src, text], i) => {
-      const chip = el("button", "source", `<b>${String(i + 1).padStart(2, "0")}</b><span>${esc(src)}</span>`);
-      chip.type = "button"; chip.style.animationDelay = `${i * 70}ms`; chip.setAttribute("aria-expanded", "false");
-      chip.onclick = () => {
-        const open = chip.getAttribute("aria-expanded") === "true";
-        $$(".source", list).forEach((c) => c.setAttribute("aria-expanded", "false"));
-        preview?.remove(); preview = null;
-        if (!open) {
-          chip.setAttribute("aria-expanded", "true");
-          preview = el("div", "source-preview"); preview.textContent = text;
-          box.appendChild(preview);
-        }
-      };
-      list.appendChild(chip);
-    });
-    box.appendChild(list);
-    ui.card.appendChild(box);
+  // A quiet trust signal: how many passages grounded the answer, never where they came from.
+  function renderGrounding(ui, passages) {
+    if (!passages) return;
+    const line = el("div", "grounding");
+    const dots = Array.from({ length: Math.min(passages, 8) }, (_, i) => `<i style="animation-delay:${i * 90}ms"></i>`).join("");
+    line.innerHTML = `<span class="g-dots">${dots}</span><span>Grounded in curated notes · ${passages} passage${passages > 1 ? "s" : ""}</span>`;
+    ui.card.appendChild(line);
   }
 
   function ratingColor(r) {
@@ -291,11 +275,11 @@
           if (!line) continue;
           const ev = JSON.parse(line.slice(5));
 
-          if (ev.type === "sources") {
+          if (ev.type === "grounding") {
             ui.setStage("retrieve", "ok"); ui.setStage("ground", "ok"); ui.setStage("reason", "on");
-            probe?.lock(ev.sources.length);
-            if (ev.cached) ui.head.appendChild(el("span", "chip cache", "⚡ cache hit"));
-            ui.sources = ev.sources;
+            probe?.lock(ev.passages);
+            if (ev.cached) ui.head.appendChild(el("span", "chip cache", "⚡ instant"));
+            ui.passages = ev.passages;
           } else if (ev.type === "token") {
             text += ev.text;
             if (!pending) { pending = true; requestAnimationFrame(paint); }
@@ -316,7 +300,7 @@
         ui.setStage("reason", "ok");
         ui.content.innerHTML = text ? markdown(text) : '<p class="empty">The tutor had nothing to say — try rephrasing.</p>';
         decorateCode(ui.content);
-        renderSources(ui, ui.sources);
+        renderGrounding(ui, ui.passages);
         if (m === "hint") {
           const note = el("div", "spoiler-note", "Still stuck after really thinking it over? ");
           const reveal = el("button", "", "Reveal the full answer →"); reveal.type = "button";

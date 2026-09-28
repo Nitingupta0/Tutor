@@ -216,23 +216,17 @@ h1 em {
 .spoiler-note { margin-top: 14px; font-size: 12.5px; color: var(--faint); display: flex; gap: 8px; align-items: center; }
 .spoiler-note button { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; font-size: 12.5px; }
 
-/* sources */
-.sources { margin-top: 16px; border-top: 1px dashed var(--line-strong); padding-top: 12px; }
-.sources-title { font: 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--faint); margin-bottom: 8px; display: flex; justify-content: space-between; }
-.source-list { display: flex; flex-wrap: wrap; gap: 8px; }
-.source {
-  display: inline-flex; align-items: center; gap: 8px; max-width: 100%;
-  padding: 6px 11px; border-radius: 10px; font: 12px var(--mono); color: var(--muted);
-  background: rgba(255,255,255,.03); border: 1px solid var(--line);
-  transition: all .2s var(--ease); animation: rise .4s var(--ease) both;
+/* grounding line — how many passages, never which files */
+.grounding {
+  display: flex; align-items: center; gap: 10px; margin-top: 16px; padding-top: 12px;
+  border-top: 1px dashed var(--line-strong);
+  font: 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--faint);
+  animation: rise .4s var(--ease) both;
 }
-.source:hover, .source[aria-expanded="true"] { color: var(--text); border-color: rgba(var(--m), .5); background: rgba(var(--m), .07); }
-.source b { font-weight: 500; color: rgb(var(--m)); }
-.source span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.source-preview {
-  margin-top: 10px; padding: 12px 14px; border-radius: 12px; font-size: 13px; color: var(--muted);
-  background: rgba(0,0,0,.25); border: 1px solid var(--line); max-height: 220px; overflow: auto; white-space: pre-wrap;
-  animation: rise .3s var(--ease) both;
+.g-dots { display: inline-flex; gap: 4px; }
+.g-dots i {
+  width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--m));
+  box-shadow: 0 0 8px rgba(var(--m), .7); animation: rise .4s var(--ease) both;
 }
 
 /* fetch results */

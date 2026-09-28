@@ -17,5 +17,5 @@ body = {
 response = requests.post(url, json=body)
 data = response.json()
 print(data["answer"])
-print("\nGrounded in:", ", ".join(source for source, _ in data["sources"]), "(cache hit)" if data["cached"] else "")
+print(f"\nGrounded in {data['passages']} passages", "(cache hit)" if data["cached"] else "")
 

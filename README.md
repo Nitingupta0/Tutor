@@ -39,7 +39,7 @@ flowchart TD
     MODE -- "fetch" --> PROB[("pgvector · problems table — exact id/title, else nearest")]
     P1 & P2 & P3 --> LLM["Groq LLM — openai/gpt-oss-120b"]
     LLM --> LOG[("MongoDB — query + chunks + answer logged")]
-    LLM --> RESP["Response + sources"]
+    LLM --> RESP["Response"]
     PROB --> RESP
 ```
 
@@ -104,7 +104,7 @@ uvicorn main:app --reload    # open http://127.0.0.1:8000
 
 - **Four modes, one composer.** The whole interface re-tints per mode (cyan answer, amber hint, rose debug, violet fetch).
 - **Streams token by token** over server-sent events, with a live `retrieve → ground → reason` progress trail.
-- **Shows its work.** Every answer lists the passages it was grounded in; click one to read the exact chunk. Cache hits are flagged.
+- **Grounded, not leaky.** Each answer notes how many passages it was grounded in, but never which files. Your notes stay internal, and the LLM is told not to cite them either. (Full sources are still logged to MongoDB for debugging.)
 - **Knowledge constellation.** The background is a field of "chunks"; each question drops a probe that locks onto its top-k neighbours, mirroring the vector search running on the server.
 - **Hint mode keeps its promise** — the full answer is one deliberate click away ("Reveal the full answer"), never the default.
 - `fetch` results link to the problem, with its rating and a similarity meter. Debug mode switches the input to monospace and `Ctrl+Enter` to send, so pasting code is painless.
@@ -128,8 +128,8 @@ The Stack Overflow importer streams the XML, so the multi-GB dump never has to f
 
 | Endpoint | Returns |
 |---|---|
-| `POST /ask` | `{"mode", "answer", "sources": [[file, chunk], ...], "cached"}` — or `{"mode": "fetch", "problems": [...]}` |
-| `POST /ask/stream` | Server-sent events: `sources` → `token`… → `done` (or `problems` → `done`; `error` on failure) |
+| `POST /ask` | `{"mode", "answer", "passages", "cached"}` — or `{"mode": "fetch", "problems": [...]}` |
+| `POST /ask/stream` | Server-sent events: `grounding` → `token`… → `done` (or `problems` → `done`; `error` on failure) |
 | `GET /health` | `{"status": "ok"}` |
 | `GET /docs` | Interactive OpenAPI docs |
 
@@ -202,7 +202,7 @@ The tests stub out Postgres, Redis, MongoDB, Groq and the embedding model, so th
 - [x] Corpus expansion — bundled notes, official-docs loader, Codeforces public API, Stack Overflow dump
 - [x] `fetch` mode — surface the exact/similar indexed problem
 - [x] CI (lint + test on PR)
-- [x] Web frontend — streaming, grounded sources, four modes
+- [x] Web frontend — streaming, grounded answers, four modes
 - [ ] Public deployment
 
 Built with corpus sourced only from this project's own notes and license-clean sources — deliberately **not** scraping GeeksforGeeks or LeetCode, since both prohibit it in their ToS.

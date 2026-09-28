@@ -20,12 +20,22 @@ DEBUG_PROMPT = """You are a DSA tutor. Use the provided context to help debug th
         code and problem. Locate the bug and explain what's wrong - not rewrite the whole solution
         from scratch. If the context is not enough , use your own knowledge."""
 
-SYSTEM_PROMPTS = {"answer": ANSWER_PROMPT, "hint": HINT_PROMPT, "debug": DEBUG_PROMPT}
+# Users never see the notes themselves, so answers must read as the tutor's own explanation.
+NO_SOURCES_RULE = """
+        Never mention the context, your notes, sources, documents or file names in your
+        reply — explain things directly, as your own knowledge."""
+
+SYSTEM_PROMPTS = {
+    "answer": ANSWER_PROMPT + NO_SOURCES_RULE,
+    "hint": HINT_PROMPT + NO_SOURCES_RULE,
+    "debug": DEBUG_PROMPT + NO_SOURCES_RULE,
+}
 LLM_MODES = tuple(SYSTEM_PROMPTS)
 
 
 def build_context(chunks: list[tuple[str, str]]) -> str:
-    return "\n\n".join(f"[{source}] {content}" for source, content in chunks)
+    """Only the passage text goes to the LLM — file names stay internal."""
+    return "\n\n---\n\n".join(content for _source, content in chunks)
 
 
 def build_user_content(context: str, query: str) -> str:
@@ -71,19 +81,21 @@ def _check_mode(mode: str) -> None:
 
 
 def ask(query: str, mode: str = "answer") -> dict:
-    """Retrieve, generate and log. Returns the answer plus the chunks it was grounded in."""
+    """Retrieve, generate and log. Returns the answer and how many passages grounded it.
+
+    Which files the passages came from is logged to MongoDB but never returned to users."""
     _check_mode(mode)
     chunks, cached = retrieve.search(query)
     result = call_llm(SYSTEM_PROMPTS[mode], build_user_content(build_context(chunks), query))
     log.log_query(query, mode, chunks, result)
-    return {"answer": result, "sources": chunks, "cached": cached}
+    return {"answer": result, "passages": len(chunks), "cached": cached}
 
 
 def ask_stream(query: str, mode: str = "answer") -> Iterator[dict]:
-    """Same as ask(), but yields events: one 'sources', many 'token', one 'done'."""
+    """Same as ask(), but yields events: one 'grounding', many 'token', one 'done'."""
     _check_mode(mode)
     chunks, cached = retrieve.search(query)
-    yield {"type": "sources", "sources": chunks, "cached": cached}
+    yield {"type": "grounding", "passages": len(chunks), "cached": cached}
 
     parts = []
     for token in stream_llm(SYSTEM_PROMPTS[mode], build_user_content(build_context(chunks), query)):
