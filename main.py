@@ -1,13 +1,17 @@
 import json
 import logging
+import threading
+import time
+from collections import defaultdict, deque
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+import config
 import generate
 import problems
 
@@ -36,13 +40,45 @@ def health():
     return {"status": "ok"}
 
 
+# Every question costs LLM quota, so a public deployment caps questions per visitor.
+_hits: dict[str, deque] = defaultdict(deque)
+_hits_lock = threading.Lock()
+
+
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for")  # set by the hosting proxy
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def rate_limit(request: Request) -> None:
+    limit = config.RATE_LIMIT_PER_MINUTE
+    if limit <= 0:
+        return
+    now = time.monotonic()
+    ip = _client_ip(request)
+    with _hits_lock:
+        window = _hits[ip]
+        while window and now - window[0] >= 60:
+            window.popleft()
+        if len(window) >= limit:
+            retry = int(60 - (now - window[0])) + 1
+            raise HTTPException(
+                status_code=429,
+                detail=f"Slow down a little — you can ask {limit} questions a minute. Try again in {retry}s.",
+                headers={"Retry-After": str(retry)},
+            )
+        window.append(now)
+
+
 def _run(request: Query) -> dict:
     if request.mode == "fetch":
         return {"mode": "fetch", "problems": problems.find_problems(request.question)}
     return {"mode": request.mode, **generate.ask(request.question, request.mode)}
 
 
-@app.post("/ask")
+@app.post("/ask", dependencies=[Depends(rate_limit)])
 def ask(request: Query):
     try:
         return _run(request)
@@ -54,7 +90,7 @@ def _sse(event: dict) -> str:
     return f"data: {json.dumps(event)}\n\n"
 
 
-@app.post("/ask/stream")
+@app.post("/ask/stream", dependencies=[Depends(rate_limit)])
 def ask_stream(request: Query):
     """Server-sent events: 'grounding' → 'token'* → 'done' (or a single 'problems' for fetch)."""
 

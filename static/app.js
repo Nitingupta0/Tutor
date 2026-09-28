@@ -213,7 +213,12 @@
     ui.content.appendChild(n);
   }
 
+  // Setup hints only help the person running the server; public visitors get plain language.
+  const isLocal = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+
   function friendlyError(msg) {
+    if (/Slow down/.test(msg)) return esc(msg);
+    if (!isLocal) return "The tutor is having a moment — please try again in a minute.";
     if (/POSTGRES_PASSWORD/.test(msg)) return `The database password isn't configured — set <code>POSTGRES_PASSWORD</code> in <code>.env</code> and restart the server.`;
     if (/GROQ_API_KEY/.test(msg)) return `The LLM isn't configured yet — add your <code>GROQ_API_KEY</code> to <code>.env</code> and restart the server.`;
     if (/connect|Connection refused|could not connect|timeout/i.test(msg))
@@ -316,7 +321,8 @@
         $$(".stage.on", ui.stages).forEach((s) => s.classList.remove("on"));
         const offline = err instanceof TypeError;
         renderError(ui, offline
-          ? "Can't reach the Tutor API. Start it with <code>uvicorn main:app --reload</code>."
+          ? (isLocal ? "Can't reach the Tutor API. Start it with <code>uvicorn main:app --reload</code>."
+                     : "Can't reach the tutor right now — check your connection and try again.")
           : friendlyError(err.message || String(err)));
         if (offline) setStatus("down", "offline");
       }

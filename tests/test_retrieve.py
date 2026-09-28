@@ -3,8 +3,26 @@ import json
 import redis
 
 import db
+import log
 import retrieve
 from tests.conftest import FakeConn
+
+REAL_LOG_QUERY = log.log_query  # captured before conftest's autouse stub replaces it
+
+
+def test_empty_redis_url_turns_caching_off(monkeypatch, fake_embed):
+    monkeypatch.setattr(retrieve.config, "REDIS_URL", "")
+    monkeypatch.setattr(retrieve, "get_redis", lambda: (_ for _ in ()).throw(AssertionError("redis should not be used")))
+    monkeypatch.setattr(db, "connect", lambda: FakeConn(results=[[("a.md", "text")]]))
+
+    assert retrieve.search("q") == ([("a.md", "text")], False)
+
+
+def test_empty_mongo_url_turns_logging_off(monkeypatch):
+    monkeypatch.setattr(log.config, "MONGO_URL", "")
+    monkeypatch.setattr(log, "_writer", None)  # would raise AttributeError if logging tried to run
+
+    REAL_LOG_QUERY("q", "answer", [], "a")
 
 
 class FakeRedis:

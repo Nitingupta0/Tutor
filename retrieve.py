@@ -14,6 +14,8 @@ def get_redis():
 
 
 def _cache_get(key: str):
+    if not config.REDIS_URL:
+        return None  # caching turned off
     try:
         return get_redis().get(key)
     except redis.RedisError:
@@ -21,6 +23,8 @@ def _cache_get(key: str):
 
 
 def _cache_set(key: str, value: str) -> None:
+    if not config.REDIS_URL:
+        return
     try:
         get_redis().set(key, value, ex=config.CACHE_TTL_SECONDS)
     except redis.RedisError:

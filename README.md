@@ -175,8 +175,12 @@ Tutor/
 ├── static/                 # Web app: index.html, app.css, app.js, constellation.js
 ├── tests/                  # pytest suite — no databases, model or API key needed
 ├── scripts/                # Manual smoke test + the original embedding scratchpad
-├── .github/workflows/ci.yml
-├── docker-compose.yml      # Postgres+pgvector, Redis, MongoDB
+├── .github/workflows/
+│   ├── ci.yml              # lint + tests on every PR
+│   └── deploy-hf.yml       # publishes main to the Hugging Face Space
+├── Dockerfile              # app image (used by Hugging Face Spaces)
+├── DEPLOY.md               # free deployment guide (Hugging Face + Neon)
+├── docker-compose.yml      # local Postgres+pgvector, Redis, MongoDB
 ├── requirements.txt / requirements-dev.txt
 └── .env.example
 ```
@@ -191,6 +195,12 @@ pytest
 
 The tests stub out Postgres, Redis, MongoDB, Groq and the embedding model, so they run in under a second with no services up. CI runs lint and tests on every push to `main` and every pull request.
 
+## Deployment
+
+Runs for free on **Hugging Face Spaces** (the app, built from the `Dockerfile`) with **Neon** (Postgres + pgvector). Redis and MongoDB are optional and switched off in that setup. Each merge to `main` re-publishes the Space automatically through `.github/workflows/deploy-hf.yml`. Visitors are limited to 20 questions a minute (`RATE_LIMIT_PER_MINUTE`) to protect the LLM quota.
+
+Step-by-step guide: **[DEPLOY.md](DEPLOY.md)**.
+
 ## Status & roadmap
 
 - [x] Ingestion pipeline (chunk → embed → store)
@@ -203,6 +213,7 @@ The tests stub out Postgres, Redis, MongoDB, Groq and the embedding model, so th
 - [x] `fetch` mode — surface the exact/similar indexed problem
 - [x] CI (lint + test on PR)
 - [x] Web frontend — streaming, grounded answers, four modes
-- [ ] Public deployment
+- [x] Deployment setup — Hugging Face Spaces + Neon, auto-deploy on merge, per-visitor rate limit
+- [ ] Public deployment live
 
 Built with corpus sourced only from this project's own notes and license-clean sources — deliberately **not** scraping GeeksforGeeks or LeetCode, since both prohibit it in their ToS.
