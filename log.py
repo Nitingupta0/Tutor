@@ -29,6 +29,8 @@ def _write(document: dict) -> None:
 
 def log_query(query: str, mode: str, chunks: list, answer) -> None:
     """Queue a query for MongoDB. Logging failures are reported but never raised."""
+    if not config.MONGO_URL:
+        return  # logging turned off
     _writer.submit(_write, {
         "query": query,
         "mode": mode,

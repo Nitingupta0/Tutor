@@ -30,15 +30,18 @@ CREATE TABLE IF NOT EXISTS problems (
 
 
 def connect():
-    if not config.POSTGRES_PASSWORD:
-        raise RuntimeError("POSTGRES_PASSWORD is not set — copy .env.example to .env and choose a password.")
-    conn = psycopg2.connect(
-        host=config.POSTGRES_HOST,
-        port=config.POSTGRES_PORT,
-        dbname=config.POSTGRES_DB,
-        user=config.POSTGRES_USER,
-        password=config.POSTGRES_PASSWORD,
-    )
+    if config.DATABASE_URL:
+        conn = psycopg2.connect(config.DATABASE_URL, connect_timeout=15)
+    else:
+        if not config.POSTGRES_PASSWORD:
+            raise RuntimeError("POSTGRES_PASSWORD is not set — copy .env.example to .env and choose a password.")
+        conn = psycopg2.connect(
+            host=config.POSTGRES_HOST,
+            port=config.POSTGRES_PORT,
+            dbname=config.POSTGRES_DB,
+            user=config.POSTGRES_USER,
+            password=config.POSTGRES_PASSWORD,
+        )
     # The extension must exist before the vector type can be registered.
     with conn.cursor() as cur:
         cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")

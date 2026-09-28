@@ -13,6 +13,35 @@ def client():
     return TestClient(main.app)
 
 
+@pytest.fixture(autouse=True)
+def fresh_rate_limit():
+    main._hits.clear()
+    yield
+    main._hits.clear()
+
+
+def test_rate_limit_blocks_after_the_limit_per_visitor(client, monkeypatch):
+    monkeypatch.setattr(main.config, "RATE_LIMIT_PER_MINUTE", 2)
+    monkeypatch.setattr(generate, "ask", lambda q, m: {"answer": "ok", "passages": 0, "cached": False})
+
+    assert client.post("/ask", json={"question": "x"}).status_code == 200
+    assert client.post("/ask", json={"question": "x"}).status_code == 200
+    blocked = client.post("/ask", json={"question": "x"})
+    assert blocked.status_code == 429
+    assert "Slow down" in blocked.json()["detail"]
+    assert int(blocked.headers["Retry-After"]) > 0
+
+    # a different visitor (as seen through the hosting proxy) is unaffected
+    other = client.post("/ask", json={"question": "x"}, headers={"X-Forwarded-For": "203.0.113.9"})
+    assert other.status_code == 200
+
+
+def test_rate_limit_can_be_turned_off(client, monkeypatch):
+    monkeypatch.setattr(main.config, "RATE_LIMIT_PER_MINUTE", 0)
+    monkeypatch.setattr(generate, "ask", lambda q, m: {"answer": "ok", "passages": 0, "cached": False})
+    assert all(client.post("/ask", json={"question": "x"}).status_code == 200 for _ in range(5))
+
+
 def test_home_serves_the_ui(client):
     r = client.get("/")
     assert r.status_code == 200
