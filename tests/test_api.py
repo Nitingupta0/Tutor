@@ -29,15 +29,15 @@ def test_health(client):
     assert client.get("/health").json() == {"status": "ok"}
 
 
-def test_ask_returns_answer_and_sources(client, monkeypatch):
-    monkeypatch.setattr(generate, "ask", lambda q, m: {"answer": f"{m}:{q}", "sources": [["a.md", "t"]], "cached": True})
+def test_ask_returns_answer_and_passage_count(client, monkeypatch):
+    monkeypatch.setattr(generate, "ask", lambda q, m: {"answer": f"{m}:{q}", "passages": 5, "cached": True})
     r = client.post("/ask", json={"question": "what is dp?", "mode": "hint"})
     assert r.status_code == 200
-    assert r.json() == {"mode": "hint", "answer": "hint:what is dp?", "sources": [["a.md", "t"]], "cached": True}
+    assert r.json() == {"mode": "hint", "answer": "hint:what is dp?", "passages": 5, "cached": True}
 
 
 def test_ask_defaults_to_answer_mode(client, monkeypatch):
-    monkeypatch.setattr(generate, "ask", lambda q, m: {"answer": m, "sources": [], "cached": False})
+    monkeypatch.setattr(generate, "ask", lambda q, m: {"answer": m, "passages": 0, "cached": False})
     assert client.post("/ask", json={"question": "x"}).json()["answer"] == "answer"
 
 
@@ -72,14 +72,14 @@ def _events(response):
 
 def test_stream_relays_generator_events(client, monkeypatch):
     def fake_stream(q, m):
-        yield {"type": "sources", "sources": [["a.md", "t"]], "cached": False}
+        yield {"type": "grounding", "passages": 5, "cached": False}
         yield {"type": "token", "text": "hi"}
         yield {"type": "done"}
 
     monkeypatch.setattr(generate, "ask_stream", fake_stream)
     r = client.post("/ask/stream", json={"question": "x", "mode": "debug"})
     assert r.headers["content-type"].startswith("text/event-stream")
-    assert [e["type"] for e in _events(r)] == ["sources", "token", "done"]
+    assert [e["type"] for e in _events(r)] == ["grounding", "token", "done"]
 
 
 def test_stream_fetch_mode(client, monkeypatch):

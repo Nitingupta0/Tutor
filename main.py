@@ -56,7 +56,7 @@ def _sse(event: dict) -> str:
 
 @app.post("/ask/stream")
 def ask_stream(request: Query):
-    """Server-sent events: 'sources' → 'token'* → 'done' (or a single 'problems' for fetch)."""
+    """Server-sent events: 'grounding' → 'token'* → 'done' (or a single 'problems' for fetch)."""
 
     def events():
         try:
