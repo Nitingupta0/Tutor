@@ -1,0 +1,65 @@
+# Production stack for a single server (e.g. an AWS EC2 instance):
+# the app, Postgres + pgvector, Redis, MongoDB, and Caddy for automatic HTTPS.
+# Secrets live in .env on the server (scripts/setup-server.sh creates it) — never in this file.
+#
+#   sudo docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_URL: redis://redis:6379/0
+      MONGO_URL: mongodb://mongo:27017/
+    volumes:
+      - ./private-notes:/app/private-notes:ro   # optional: your own notes, never committed
+    depends_on:
+      - postgres
+      - redis
+      - mongo
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    env_file: .env          # supplies the database password
+    environment:
+      POSTGRES_USER: rag
+      POSTGRES_DB: rag_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    command: ["--wiredTigerCacheSizeGB", "0.25"]   # keep memory small on a 2 GB server
+    volumes:
+      - mongodata:/data/db
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    env_file: .env          # SITE_ADDRESS: your domain for HTTPS, or :80 for plain HTTP by IP
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+# Only Caddy is reachable from the internet; the databases stay on Docker's private network.
+volumes:
+  pgdata:
+  mongodata:
+  caddy_data:
+  caddy_config:

@@ -1,99 +1,111 @@
-# Deploying Tutor for free (Hugging Face + Neon)
+# Deploying Tutor on AWS (free for up to 6 months)
 
-- **Neon** hosts the database (Postgres with pgvector). Free, no credit card.
-- **Hugging Face Spaces** runs the app. Free, no credit card.
-- **GitHub** re-publishes the app automatically every time you merge into `main`.
+The whole app runs on one small AWS server: the website, Postgres, the Redis cache, MongoDB logs, and **Caddy**, which gives you HTTPS automatically. One script does most of the work.
 
-Redis (cache) and MongoDB (logs) are skipped. The app works fine without them.
+**What it costs:** new AWS accounts on the **Free plan** get $100–$200 in credits, valid for 6 months. This server uses roughly **$20–25 of credits a month**. On the Free plan AWS **does not charge your card**. When the credits or the 6 months run out, the account closes unless you choose to upgrade.
 
-> The free Space goes to sleep after about 2 days with no visitors. The next visitor waits about a minute while it wakes up.
+> ⏰ The 6 months start when you create the account, so create it shortly before placement season begins.
 
-Total time: about 20–30 minutes, done once.
+Total time: about 30–40 minutes, done once.
 
 ---
 
-## Part 1: Create the database (Neon)
+## Part 1: Create an AWS account
 
-1. Go to **https://neon.tech** and click **Sign up**. "Continue with GitHub" is easiest.
-2. Create a project:
-   - Project name: `tutor`
-   - Region: **AWS US East (N. Virginia)**. This is close to where Hugging Face runs, which keeps the app fast.
-3. On the project dashboard, click **Connect**. Copy the **connection string**. It looks like:
-   ```
-   postgresql://neondb_owner:xxxxxxxx@ep-something.us-east-1.aws.neon.tech/neondb?sslmode=require
-   ```
-   Keep it private: it works like a password.
+1. Go to **https://aws.amazon.com** → **Create an AWS account**.
+2. When asked to choose a plan, pick the **Free plan**, not the Paid plan. It needs a card to verify your identity, but won't charge it.
+3. After signing in, pick **Asia Pacific (Mumbai)** from the region menu (top-right, next to your name). This keeps the site fast for visitors in India.
+4. *(Optional)* The AWS home page lists small "Explore AWS" tasks. Completing them adds up to $100 more in credits.
 
-## Part 2: Fill the database (from your laptop)
+## Part 2: Create the server
 
-4. In your project folder on your laptop, get the latest code:
-   ```powershell
-   git checkout main
-   git pull origin main
-   ```
-5. Open your `.env` file and add this line, pasting your Neon connection string after the `=`:
-   ```
-   DATABASE_URL=postgresql://neondb_owner:xxxxxxxx@ep-something.us-east-1.aws.neon.tech/neondb?sslmode=require
-   ```
-6. Run these **one at a time**, waiting for each to finish:
-   ```powershell
-   python ingest.py
-   python ingest.py D:\Placement_Prep\DSA --append
-   python -m corpus.codeforces --max-rating 2000
-   ```
-   - The first line uploads the bundled notes.
-   - The second line (optional) adds your own notes.
-   - The third line (optional) is what makes Fetch mode work.
+5. In the search bar at the top, type **EC2** and open it → **Launch instance**. Fill in:
+   | Field | Value |
+   |---|---|
+   | Name | `tutor` |
+   | OS image | **Ubuntu** → **Ubuntu Server 24.04 LTS** |
+   | Instance type | **t3.small** |
+   | Key pair | **Create new key pair** → name `tutor-key` → type RSA, format `.pem` → **Create**. A file downloads; keep it safe. |
+   | Network settings | tick **Allow SSH traffic**, **Allow HTTPS traffic from the internet** and **Allow HTTP traffic from the internet** |
+   | Configure storage | change **8** to **20** GiB (gp3) |
 
-   While `DATABASE_URL` is in `.env`, the app on your laptop also uses the Neon database. Delete that line to go back to the local Docker database.
+   Then click **Launch instance**.
+6. Give the server a fixed address, so it doesn't change when the server restarts:
+   - In the EC2 left menu, open **Elastic IPs** → **Allocate Elastic IP address** → **Allocate**.
+   - Select the new address → **Actions** → **Associate Elastic IP address** → choose the `tutor` instance → **Associate**.
+   - Write the address down (for example `13.233.45.67`).
 
-## Part 3: Create the app (Hugging Face)
+## Part 3: Get a free web address (recommended)
 
-7. Go to **https://huggingface.co** and sign up. Remember your **username**.
-8. Click your profile picture → **New Space**, and fill in:
-   - Space name: `tutor`
-   - SDK: **Docker** → **Blank**
-   - Hardware: **CPU basic · Free**
-   - Visibility: **Public**
+Without this, your site works at `http://13.233.45.67`, and browsers show it as "Not secure". With it, you get a proper `https://` link.
 
-   Then click **Create Space**. It will be empty for now; that's expected.
-9. In the new Space, open **Settings** → **Variables and secrets** → **New secret**, and add these two:
+7. Go to **https://www.duckdns.org** and sign in with GitHub.
+8. Type a name (for example `tutor-nitin`) → **add domain**.
+9. In the **current ip** box next to it, paste your Elastic IP from step 6 → **update ip**.
+
+Your address is now `tutor-nitin.duckdns.org`.
+
+## Part 4: Set up the server (one command)
+
+10. In EC2 → **Instances**, select `tutor` → **Connect** → **EC2 Instance Connect** tab → **Connect**. A terminal opens in your browser.
+11. Paste these lines and press Enter:
+    ```bash
+    git clone https://github.com/Nitingupta0/Tutor.git
+    cd Tutor
+    bash scripts/setup-server.sh
+    ```
+12. It asks two questions:
+    - **Groq API key:** paste your key.
+    - **Domain:** type `tutor-nitin.duckdns.org` (your name from step 8), or just press Enter to use the IP address.
+
+    Then wait about **10–15 minutes**. It installs everything, creates a random database password on the server, starts the app and fills the database. It ends with **"Done! Open https://…"**.
+13. Open that link. 🎉
+
+---
+
+## Updating the site after you change the code
+
+**By hand:** open the browser terminal (step 10) and run:
+```bash
+cd Tutor && bash scripts/update.sh
+```
+
+**Automatically (optional):** after this, every merge into `main` updates the site by itself.
+1. On GitHub: **Nitingupta0/Tutor** → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**. Add two:
    | Name | Value |
    |---|---|
-   | `GROQ_API_KEY` | your Groq key |
-   | `DATABASE_URL` | the Neon connection string from step 3 |
-10. Create a key that lets GitHub publish to your Space: profile picture → **Settings** → **Access Tokens** → **Create new token** → choose type **Write** → name it `github-deploy` → **Create**. Copy the token; it starts with `hf_`.
+   | `EC2_HOST` | your Elastic IP (for example `13.233.45.67`) |
+   | `EC2_SSH_KEY` | open `tutor-key.pem` in Notepad and copy **everything**, including the `-----BEGIN…` and `-----END…` lines |
+2. Test it: **Actions** tab → **Deploy to server** → **Run workflow**.
 
-## Part 4: Connect GitHub to Hugging Face
+## Adding your own notes (optional)
 
-11. Open **https://github.com/Nitingupta0/Tutor** → **Settings** → **Secrets and variables** → **Actions**.
-12. On the **Secrets** tab, click **New repository secret**:
-    - Name: `HF_TOKEN`
-    - Value: the `hf_…` token from step 10
-13. On the **Variables** tab, click **New repository variable**:
-    - Name: `HF_SPACE`
-    - Value: `<your-huggingface-username>/tutor` (for example `nitingupta0/tutor`)
-14. Open the **Actions** tab → **Deploy to Hugging Face** (left side) → **Run workflow** → **Run workflow**. Wait for the green tick, which takes about 30 seconds.
+Your own notes stay private and never go to GitHub. From **PowerShell on your laptop**, in the folder where `tutor-key.pem` is:
+```powershell
+icacls tutor-key.pem /inheritance:r
+icacls tutor-key.pem /grant:r "$($env:USERNAME):(R)"
+scp -i tutor-key.pem -r D:\Placement_Prep\DSA\* ubuntu@13.233.45.67:~/Tutor/private-notes/
+```
+(Use your own Elastic IP. The two `icacls` lines are needed only once; Windows otherwise refuses to use the key.)
 
-## Part 5: Open your app
+Then, in the browser terminal on the server:
+```bash
+cd Tutor && bash scripts/update.sh --reindex
+```
 
-15. Go back to your Space on Hugging Face. It shows **Building** for about 5–10 minutes the first time, then **Running**.
-16. Your public link is:
-    ```
-    https://<your-huggingface-username>-tutor.hf.space
-    ```
+## Keeping an eye on credits
 
-From now on, **every merge into `main` updates the live app automatically**.
-
----
+- **Check your remaining credits:** search **Billing** → **Credits**, or open the **Free Tier** page.
+- **Pause the site when you don't need it:** EC2 → select `tutor` → **Instance state** → **Stop**. Your data is kept, and it uses far fewer credits (only the disk and the IP address). **Start** it again whenever you need it.
+- **When placement season is over:** **Terminate** the instance, then release the Elastic IP (**Elastic IPs** → **Actions** → **Release**).
 
 ## If something goes wrong
 
 | What you see | What to do |
 |---|---|
-| The Actions run says "HF_TOKEN or HF_SPACE not configured yet" | Redo steps 12–13. The names must match exactly. |
-| The Actions run fails with "403" or "Authentication" | The token must be type **Write** (step 10). Create a new one and update `HF_TOKEN`. |
-| The Space shows **Build error** | Click **Logs** → **Build** on the Space and share the last lines. |
-| The app says "The tutor is having a moment" | Check both secrets in step 9, then click **Restart Space** in Settings. |
-| Fetch says "No problems indexed yet" | Run the Codeforces command in step 6. |
-| "Slow down a little…" | That's the spam limit: 20 questions per minute per visitor. To change it, add a Space variable `RATE_LIMIT_PER_MINUTE`. |
+| The site doesn't load right after setup | Wait 2 minutes (HTTPS takes a moment the first time), then refresh. |
+| "Not secure" or a certificate error on the duckdns link | Check that DuckDNS shows the **same IP** as your Elastic IP (step 9), then run `cd Tutor && sudo docker compose -f docker-compose.prod.yml restart caddy`. |
+| "The tutor is having a moment" | Run `cd Tutor && sudo docker compose -f docker-compose.prod.yml logs app --tail 50` and share the output. |
+| Fetch says "No problems indexed yet" | Run `cd Tutor && bash scripts/update.sh --codeforces`. |
+| The Groq key was typed wrong | Run `cd Tutor && nano .env`, fix the `GROQ_API_KEY=` line, save (Ctrl+O, Enter, Ctrl+X), then run `bash scripts/update.sh`. |
+| Want to see what's running | `sudo docker compose -f docker-compose.prod.yml ps` |

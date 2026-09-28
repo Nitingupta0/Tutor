@@ -1,7 +1,7 @@
-# Image for Hugging Face Spaces (or any container host). Serves the app on port 7860.
+# App image, used by docker-compose.prod.yml. Serves the app on port 7860.
 FROM python:3.11-slim
 
-# No Redis / MongoDB in the hosted setup, so caching and logging are switched off.
+# Redis / MongoDB are off unless their URLs are provided (docker-compose.prod.yml sets them).
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     HF_HOME=/app/.cache/huggingface \
@@ -9,7 +9,7 @@ ENV PYTHONUNBUFFERED=1 \
     REDIS_URL="" \
     MONGO_URL=""
 
-# Spaces run containers as user 1000.
+# Run as an unprivileged user.
 RUN useradd --create-home --uid 1000 user
 WORKDIR /app
 
