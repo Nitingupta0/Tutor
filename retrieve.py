@@ -1,31 +1,56 @@
-from sentence_transformers import util , SentenceTransformer
-import psycopg2
-from pgvector.psycopg2 import register_vector
-import redis
 import json
+from functools import lru_cache
 
-def retrieve(query : str , top_k : int = 5) -> list[tuple[str,str]]:
-    r = redis.Redis(host = "localhost" , port=6379 , decode_responses = True)
+import redis
+
+import config
+import db
+import embed
+
+
+@lru_cache(maxsize=1)
+def get_redis():
+    return redis.Redis.from_url(config.REDIS_URL, decode_responses=True)
+
+
+def _cache_get(key: str):
+    try:
+        return get_redis().get(key)
+    except redis.RedisError:
+        return None  # cache is an optimisation — never fail a request because of it
+
+
+def _cache_set(key: str, value: str) -> None:
+    try:
+        get_redis().set(key, value, ex=config.CACHE_TTL_SECONDS)
+    except redis.RedisError:
+        pass
+
+
+def search(query: str, top_k: int = config.TOP_K) -> tuple[list[tuple[str, str]], bool]:
+    """Return (top-k (source, content) chunks, whether they came from the cache)."""
     key = f"query:{query}:{top_k}"
-    response = r.get(key)
-    if response :
-        answer = [tuple(x) for x in json.loads(response)]
-        return answer
+    cached = _cache_get(key)
+    if cached:
+        return [tuple(x) for x in json.loads(cached)], True
 
-    model = SentenceTransformer('all-MiniLM-L6-v2')
-    embeddings = model.encode(query)
+    embedding = embed.encode(query)
 
-    conn = psycopg2.connect(host="localhost", port=5432, dbname="rag_db", user="rag", password="rag_dev_pw")
-    register_vector(conn)
+    conn = db.connect()
     cur = conn.cursor()
-
-    cur.execute('Select source,content FROM document_chunks ORDER BY embedding <=> %s LIMIT %s' , (embeddings,top_k))
+    cur.execute(
+        "SELECT source, content FROM document_chunks ORDER BY embedding <=> %s LIMIT %s",
+        (embedding, top_k),
+    )
     results = cur.fetchall()
-
-    r.set(key , json.dumps(results) , ex = 3600)
     conn.close()
 
-    return results
+    _cache_set(key, json.dumps(results))
+    return results, False
+
+
+def retrieve(query: str, top_k: int = config.TOP_K) -> list[tuple[str, str]]:
+    return search(query, top_k)[0]
 
 
 if __name__ == "__main__":
