@@ -174,12 +174,17 @@ Tutor/
 ├── notes/                  # Bundled seed notes (brute force → bottleneck → tool)
 ├── static/                 # Web app: index.html, app.css, app.js, constellation.js
 ├── tests/                  # pytest suite — no databases, model or API key needed
-├── scripts/                # Manual smoke test + the original embedding scratchpad
+├── scripts/
+│   ├── setup-server.sh     # one-time server setup (Docker, swap, .env, start, index)
+│   ├── update.sh           # pull + rebuild + restart on the server
+│   └── smoke_test.py, scratch_embed.py
 ├── .github/workflows/
 │   ├── ci.yml              # lint + tests on every PR
-│   └── deploy-hf.yml       # publishes main to the Hugging Face Space
-├── Dockerfile              # app image (used by Hugging Face Spaces)
-├── DEPLOY.md               # free deployment guide (Hugging Face + Neon)
+│   └── deploy-server.yml   # optional: updates the server on every merge to main
+├── Dockerfile              # app image
+├── docker-compose.prod.yml # production stack: app, Postgres, Redis, MongoDB, Caddy (HTTPS)
+├── Caddyfile               # HTTPS + reverse proxy
+├── DEPLOY.md               # step-by-step Azure deployment guide
 ├── docker-compose.yml      # local Postgres+pgvector, Redis, MongoDB
 ├── requirements.txt / requirements-dev.txt
 └── .env.example
@@ -197,7 +202,9 @@ The tests stub out Postgres, Redis, MongoDB, Groq and the embedding model, so th
 
 ## Deployment
 
-Runs for free on **Hugging Face Spaces** (the app, built from the `Dockerfile`) with **Neon** (Postgres + pgvector). Redis and MongoDB are optional and switched off in that setup. Each merge to `main` re-publishes the Space automatically through `.github/workflows/deploy-hf.yml`. Visitors are limited to 20 questions a minute (`RATE_LIMIT_PER_MINUTE`) to protect the LLM quota.
+Runs on a single Linux VM (an **Azure** `Standard_B1ms`, Ubuntu 24.04, via Azure for Students) with Docker Compose. `docker-compose.prod.yml` runs the app, Postgres + pgvector, Redis, MongoDB, and **Caddy**, which issues HTTPS certificates automatically. Only ports 80/443 are public; the databases stay on Docker's private network. `scripts/setup-server.sh` provisions a fresh server in one command and generates the database password on the server. `.github/workflows/deploy-server.yml` can update the server on every merge to `main`. Visitors are limited to 20 questions a minute (`RATE_LIMIT_PER_MINUTE`) to protect the LLM quota.
+
+The app also accepts a single `DATABASE_URL` (e.g. a hosted Postgres such as Neon), and Redis/MongoDB can be switched off with empty URLs, for lighter hosting setups.
 
 Step-by-step guide: **[DEPLOY.md](DEPLOY.md)**.
 
@@ -213,7 +220,7 @@ Step-by-step guide: **[DEPLOY.md](DEPLOY.md)**.
 - [x] `fetch` mode — surface the exact/similar indexed problem
 - [x] CI (lint + test on PR)
 - [x] Web frontend — streaming, grounded answers, four modes
-- [x] Deployment setup — Hugging Face Spaces + Neon, auto-deploy on merge, per-visitor rate limit
+- [x] Deployment setup — Azure VM + Docker Compose + Caddy (HTTPS), one-command provisioning, auto-deploy on merge, per-visitor rate limit
 - [ ] Public deployment live
 
 Built with corpus sourced only from this project's own notes and license-clean sources — deliberately **not** scraping GeeksforGeeks or LeetCode, since both prohibit it in their ToS.

@@ -1,99 +1,125 @@
-# Deploying Tutor for free (Hugging Face + Neon)
+# Deploying Tutor on Azure (free with Azure for Students)
 
-- **Neon** hosts the database (Postgres with pgvector). Free, no credit card.
-- **Hugging Face Spaces** runs the app. Free, no credit card.
-- **GitHub** re-publishes the app automatically every time you merge into `main`.
+The whole app runs on one small Azure server (a "virtual machine"): the website, Postgres, the Redis cache, MongoDB logs, and **Caddy**, which gives you HTTPS automatically. One script does most of the work.
 
-Redis (cache) and MongoDB (logs) are skipped. The app works fine without them.
+**What it costs:** Azure for Students gives **$100 of credit for 12 months**, with no card needed. This server uses roughly **$20–25 of credit a month**, so it runs for about **4–5 months** non-stop, or longer if you stop it when you don't need it. When the credit runs out, Azure switches the server off; **it never charges you**.
 
-> The free Space goes to sleep after about 2 days with no visitors. The next visitor waits about a minute while it wakes up.
-
-Total time: about 20–30 minutes, done once.
+Total time: about 30–40 minutes, done once.
 
 ---
 
-## Part 1: Create the database (Neon)
+## Part 1: Create the server
 
-1. Go to **https://neon.tech** and click **Sign up**. "Continue with GitHub" is easiest.
-2. Create a project:
-   - Project name: `tutor`
-   - Region: **AWS US East (N. Virginia)**. This is close to where Hugging Face runs, which keeps the app fast.
-3. On the project dashboard, click **Connect**. Copy the **connection string**. It looks like:
+1. Go to **https://portal.azure.com** and sign in with the account where Azure for Students is active.
+2. In the search bar at the top, type **Virtual machines** → open it → **Create** → **Azure virtual machine**.
+3. Fill in the **Basics** tab:
+   | Field | Value |
+   |---|---|
+   | Subscription | **Azure for Students** |
+   | Resource group | **Create new** → `tutor-rg` |
+   | Virtual machine name | `tutor` |
+   | Region | **(Asia Pacific) Central India** |
+   | Availability options | **No infrastructure redundancy required** |
+   | Security type | **Standard** |
+   | Image | **Ubuntu Server 24.04 LTS – x64 Gen2** |
+   | Size | click **See all sizes**, search `B1ms`, pick **Standard_B1ms** (1 vCPU, 2 GiB) → **Select** |
+   | Authentication type | **Password** |
+   | Username | `azureuser` |
+   | Password | a strong password. **Write it down**: you'll type it to log in. |
+   | Public inbound ports | **Allow selected ports** → tick **HTTP (80)**, **HTTPS (443)**, **SSH (22)** |
+
+   > If B1ms says "not available" in Central India, change the Region to **South India** or **East US** and try again. Student subscriptions don't offer every size everywhere.
+4. Click **Next: Disks** → set **OS disk type** to **Standard SSD** (cheaper, and plenty fast).
+5. Click **Next: Networking** → tick **Delete public IP and NIC when VM is deleted**.
+6. Click **Next: Management**. If **Enable auto-shutdown** is ticked, **untick it**. Otherwise Azure turns your site off every evening.
+7. Click **Review + create** → **Create**. Wait about 1 minute, then click **Go to resource**.
+
+## Part 2: Give it a web address (free, built into Azure)
+
+8. On the VM's page, next to **Public IP address**, click the IP (for example `20.193.45.67`). This opens the IP's settings.
+9. Open **Settings → Configuration**:
+   - **Assignment:** choose **Static**, so the address never changes.
+   - **DNS name label:** type something like `tutor-nitin`.
+   - Click **Save**.
+
+   Your web address is now shown under the label, for example:
    ```
-   postgresql://neondb_owner:xxxxxxxx@ep-something.us-east-1.aws.neon.tech/neondb?sslmode=require
+   tutor-nitin.centralindia.cloudapp.azure.com
    ```
-   Keep it private: it works like a password.
+   Copy it; you'll need it in step 12.
 
-## Part 2: Fill the database (from your laptop)
+## Part 3: Set up the server (one command)
 
-4. In your project folder on your laptop, get the latest code:
-   ```powershell
-   git checkout main
-   git pull origin main
+10. Open **PowerShell** on your laptop and log in to the server (use your own IP from step 8):
+    ```powershell
+    ssh azureuser@20.193.45.67
+    ```
+    - It asks "Are you sure you want to continue connecting?" → type `yes`.
+    - Type the password from step 3. It stays invisible while you type; that's normal.
+11. Now you're on the server. Paste these lines and press Enter:
+    ```bash
+    git clone https://github.com/Nitingupta0/Tutor.git
+    cd Tutor
+    bash scripts/setup-server.sh
+    ```
+    If it asks for your server password (`[sudo] password`), type it again.
+12. It asks two questions:
+    - **Groq API key:** paste your key. To paste in PowerShell, right-click.
+    - **Domain:** paste your address from step 9, for example `tutor-nitin.centralindia.cloudapp.azure.com`.
+
+    Then wait about **10–15 minutes**. It installs everything, creates a random database password on the server, starts the app and fills the database. It ends with **"Done! Open https://…"**.
+13. Open that link. 🎉
+
+---
+
+## Updating the site after you change the code
+
+**By hand:** log in (step 10) and run:
+```bash
+cd Tutor && bash scripts/update.sh
+```
+
+**Automatically (optional):** after this, every merge into `main` updates the site by itself.
+1. Log in to the server (step 10) and run these three lines. They create a key that only GitHub will use:
+   ```bash
+   ssh-keygen -t ed25519 -f ~/.ssh/github_deploy -N "" -C github-deploy
+   cat ~/.ssh/github_deploy.pub >> ~/.ssh/authorized_keys
+   cat ~/.ssh/github_deploy
    ```
-5. Open your `.env` file and add this line, pasting your Neon connection string after the `=`:
-   ```
-   DATABASE_URL=postgresql://neondb_owner:xxxxxxxx@ep-something.us-east-1.aws.neon.tech/neondb?sslmode=require
-   ```
-6. Run these **one at a time**, waiting for each to finish:
-   ```powershell
-   python ingest.py
-   python ingest.py D:\Placement_Prep\DSA --append
-   python -m corpus.codeforces --max-rating 2000
-   ```
-   - The first line uploads the bundled notes.
-   - The second line (optional) adds your own notes.
-   - The third line (optional) is what makes Fetch mode work.
-
-   While `DATABASE_URL` is in `.env`, the app on your laptop also uses the Neon database. Delete that line to go back to the local Docker database.
-
-## Part 3: Create the app (Hugging Face)
-
-7. Go to **https://huggingface.co** and sign up. Remember your **username**.
-8. Click your profile picture → **New Space**, and fill in:
-   - Space name: `tutor`
-   - SDK: **Docker** → **Blank**
-   - Hardware: **CPU basic · Free**
-   - Visibility: **Public**
-
-   Then click **Create Space**. It will be empty for now; that's expected.
-9. In the new Space, open **Settings** → **Variables and secrets** → **New secret**, and add these two:
+   The last line prints a private key, starting `-----BEGIN OPENSSH PRIVATE KEY-----`. Select all of it, **including** the BEGIN and END lines, and copy it.
+2. On GitHub: **Nitingupta0/Tutor** → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**. Add three:
    | Name | Value |
    |---|---|
-   | `GROQ_API_KEY` | your Groq key |
-   | `DATABASE_URL` | the Neon connection string from step 3 |
-10. Create a key that lets GitHub publish to your Space: profile picture → **Settings** → **Access Tokens** → **Create new token** → choose type **Write** → name it `github-deploy` → **Create**. Copy the token; it starts with `hf_`.
+   | `SERVER_HOST` | your web address from step 9 |
+   | `SERVER_USER` | `azureuser` |
+   | `SERVER_SSH_KEY` | the key you copied |
+3. Test it: **Actions** tab → **Deploy to server** → **Run workflow**.
 
-## Part 4: Connect GitHub to Hugging Face
+## Adding your own notes (optional)
 
-11. Open **https://github.com/Nitingupta0/Tutor** → **Settings** → **Secrets and variables** → **Actions**.
-12. On the **Secrets** tab, click **New repository secret**:
-    - Name: `HF_TOKEN`
-    - Value: the `hf_…` token from step 10
-13. On the **Variables** tab, click **New repository variable**:
-    - Name: `HF_SPACE`
-    - Value: `<your-huggingface-username>/tutor` (for example `nitingupta0/tutor`)
-14. Open the **Actions** tab → **Deploy to Hugging Face** (left side) → **Run workflow** → **Run workflow**. Wait for the green tick, which takes about 30 seconds.
+Your own notes stay private and never go to GitHub. From **PowerShell on your laptop** (use your IP; it asks for the server password):
+```powershell
+scp -r D:\Placement_Prep\DSA\* azureuser@20.193.45.67:~/Tutor/private-notes/
+```
+Then log in to the server (step 10) and run:
+```bash
+cd Tutor && bash scripts/update.sh --reindex
+```
 
-## Part 5: Open your app
+## Keeping an eye on credit
 
-15. Go back to your Space on Hugging Face. It shows **Building** for about 5–10 minutes the first time, then **Running**.
-16. Your public link is:
-    ```
-    https://<your-huggingface-username>-tutor.hf.space
-    ```
-
-From now on, **every merge into `main` updates the live app automatically**.
-
----
+- **Check your remaining credit:** go to https://www.microsoftazuresponsorships.com/balance, or search **Subscriptions** in the portal → **Azure for Students**.
+- **Pause the site when you don't need it:** open the VM → **Stop**. This stops the main cost while keeping all your data. Click **Start** to bring it back; it comes up with the same address, and the app starts by itself.
+- **When placement season is over:** open **Resource groups** → `tutor-rg` → **Delete resource group**. That removes everything.
 
 ## If something goes wrong
 
 | What you see | What to do |
 |---|---|
-| The Actions run says "HF_TOKEN or HF_SPACE not configured yet" | Redo steps 12–13. The names must match exactly. |
-| The Actions run fails with "403" or "Authentication" | The token must be type **Write** (step 10). Create a new one and update `HF_TOKEN`. |
-| The Space shows **Build error** | Click **Logs** → **Build** on the Space and share the last lines. |
-| The app says "The tutor is having a moment" | Check both secrets in step 9, then click **Restart Space** in Settings. |
-| Fetch says "No problems indexed yet" | Run the Codeforces command in step 6. |
-| "Slow down a little…" | That's the spam limit: 20 questions per minute per visitor. To change it, add a Space variable `RATE_LIMIT_PER_MINUTE`. |
+| `ssh` says "Connection timed out" | Check the VM is **Running**, and that step 3 allowed **SSH (22)**: VM → **Networking** should list port 22. |
+| The site doesn't load right after setup | Wait 2 minutes (HTTPS takes a moment the first time), then refresh. |
+| Certificate or "Not secure" error | Make sure you typed exactly the address from step 9 in step 12. To change it: `cd Tutor && nano .env`, fix the `SITE_ADDRESS=` line, save (Ctrl+O, Enter, Ctrl+X), then run `sudo docker compose -f docker-compose.prod.yml restart caddy`. |
+| "The tutor is having a moment" | Run `cd Tutor && sudo docker compose -f docker-compose.prod.yml logs app --tail 50` and share the output. |
+| Fetch says "No problems indexed yet" | Run `cd Tutor && bash scripts/update.sh --codeforces`. |
+| The Groq key was typed wrong | Run `cd Tutor && nano .env`, fix the `GROQ_API_KEY=` line, save, then run `bash scripts/update.sh`. |
+| Want to see what's running | `sudo docker compose -f docker-compose.prod.yml ps` |

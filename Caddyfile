@@ -1,0 +1,9 @@
+# SITE_ADDRESS comes from .env: a domain (e.g. tutor-nitin.centralindia.cloudapp.azure.com) gets HTTPS automatically;
+# ":80" serves plain HTTP on the server's IP address.
+{$SITE_ADDRESS::80} {
+	encode gzip
+	reverse_proxy app:7860 {
+		# stream answers token by token instead of buffering them
+		flush_interval -1
+	}
+}
