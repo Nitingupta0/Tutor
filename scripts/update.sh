@@ -7,7 +7,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-COMPOSE="sudo docker compose -f docker-compose.prod.yml"
+# Use docker directly when this user may (setup-server.sh arranges that), else fall back to sudo.
+if docker info >/dev/null 2>&1; then DOCKER="docker"; else DOCKER="sudo docker"; fi
+COMPOSE="$DOCKER compose -f docker-compose.prod.yml"
 
 git pull --ff-only origin main
 $COMPOSE up -d --build --remove-orphans
@@ -27,5 +29,5 @@ for arg in "$@"; do
   esac
 done
 
-sudo docker image prune -f >/dev/null   # free disk space from old builds
+$DOCKER image prune -f >/dev/null   # free disk space from old builds
 echo "Updated."

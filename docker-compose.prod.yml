@@ -1,4 +1,4 @@
-# Production stack for a single server (e.g. an AWS EC2 instance):
+# Production stack for a single Linux server (e.g. an Azure VM):
 # the app, Postgres + pgvector, Redis, MongoDB, and Caddy for automatic HTTPS.
 # Secrets live in .env on the server (scripts/setup-server.sh creates it) — never in this file.
 #

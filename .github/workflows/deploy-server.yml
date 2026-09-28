@@ -1,0 +1,48 @@
+name: Deploy to server
+
+# Optional: after every merge to main, log in to the server and run scripts/update.sh.
+# Needs, in GitHub → Settings → Secrets and variables → Actions → Secrets:
+#   SERVER_HOST     the server's address (IP or domain)
+#   SERVER_USER     the login name on the server (e.g. azureuser)
+#   SERVER_SSH_KEY  a private key allowed to log in (DEPLOY.md shows how to create one)
+# Until all three exist this workflow does nothing.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-server
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check configuration
+        id: check
+        env:
+          HOST: ${{ secrets.SERVER_HOST }}
+          USER_NAME: ${{ secrets.SERVER_USER }}
+          KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          if [ -z "$HOST" ] || [ -z "$USER_NAME" ] || [ -z "$KEY" ]; then
+            echo "SERVER_HOST, SERVER_USER or SERVER_SSH_KEY not configured — skipping deploy."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update the server
+        if: steps.check.outputs.enabled == 'true'
+        env:
+          HOST: ${{ secrets.SERVER_HOST }}
+          USER_NAME: ${{ secrets.SERVER_USER }}
+          KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          install -m 600 /dev/null key
+          printf '%s\n' "$KEY" > key
+          ssh -i key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 \
+            "${USER_NAME}@${HOST}" 'cd ~/Tutor && bash scripts/update.sh'
+          rm -f key

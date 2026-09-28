@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-time setup of a fresh Ubuntu server (e.g. AWS EC2). Run from the project folder:
+# One-time setup of a fresh Ubuntu server (e.g. an Azure VM). Run from the project folder:
 #
 #   bash scripts/setup-server.sh
 #
@@ -18,6 +18,9 @@ if ! command -v docker >/dev/null 2>&1; then
 else
   echo "Docker already installed."
 fi
+# Let this user run docker without sudo (takes effect from the next login),
+# so scripts/update.sh can run unattended, e.g. from the auto-deploy workflow.
+sudo usermod -aG docker "$USER"
 
 step "Adding 2 GB of swap memory (helps a small server)"
 if ! sudo swapon --show | grep -q /swapfile; then
@@ -35,7 +38,7 @@ if [ -f .env ]; then
   echo ".env already exists — keeping it."
 else
   read -rp "Paste your Groq API key: " groq_key </dev/tty
-  read -rp "Your domain (e.g. tutor-nitin.duckdns.org), or press Enter to use the IP address: " domain </dev/tty
+  read -rp "Your domain (e.g. tutor-nitin.centralindia.cloudapp.azure.com), or press Enter to use the IP address: " domain </dev/tty
   umask 077
   cat > .env <<EOF
 GROQ_API_KEY=${groq_key}
