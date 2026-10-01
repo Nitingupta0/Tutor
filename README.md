@@ -2,6 +2,8 @@
 
 **A self-hosted, RAG-grounded DSA tutor — API and web app.** Ask it a DSA question and it doesn't just answer — it can also give you a Socratic hint that never spoils the solution, find the bug in your pasted code, or surface the exact problem you're thinking of, all grounded in retrieved context instead of pure LLM guesswork.
 
+**▶ Try it live: [tutor.lucifer07o.tech](https://tutor.lucifer07o.tech)**
+
 ![Tutor web UI](docs/hero.png)
 
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
@@ -202,11 +204,11 @@ The tests stub out Postgres, Redis, MongoDB, Groq and the embedding model, so th
 
 ## Deployment
 
-Runs on a single Linux VM (an **Azure** `Standard_B1ms`, Ubuntu 24.04, via Azure for Students) with Docker Compose. `docker-compose.prod.yml` runs the app, Postgres + pgvector, Redis, MongoDB, and **Caddy**, which issues HTTPS certificates automatically. Only ports 80/443 are public; the databases stay on Docker's private network. `scripts/setup-server.sh` provisions a fresh server in one command and generates the database password on the server. `.github/workflows/deploy-server.yml` can update the server on every merge to `main`. Visitors are limited to 20 questions a minute (`RATE_LIMIT_PER_MINUTE`) to protect the LLM quota.
+Runs on a single Linux server with Docker Compose. The live demo is on an Azure `Standard_B2als_v2`, but any Ubuntu server with 2 GB+ RAM works. `docker-compose.prod.yml` runs the app, Postgres + pgvector, Redis, MongoDB, and **Caddy**, which issues HTTPS certificates automatically. Only ports 80/443 are public; the databases stay on Docker's private network. `scripts/setup-server.sh` provisions a fresh server in one command and generates the database password on the server. `.github/workflows/deploy-server.yml` can update the server on every merge to `main`. Visitors are limited to 20 questions a minute (`RATE_LIMIT_PER_MINUTE`) to protect the LLM quota.
 
 The app also accepts a single `DATABASE_URL` (e.g. a hosted Postgres such as Neon), and Redis/MongoDB can be switched off with empty URLs, for lighter hosting setups.
 
-Step-by-step guide: **[DEPLOY.md](DEPLOY.md)**.
+Deployment guide: **[DEPLOY.md](DEPLOY.md)**.
 
 ## Status & roadmap
 
@@ -220,7 +222,7 @@ Step-by-step guide: **[DEPLOY.md](DEPLOY.md)**.
 - [x] `fetch` mode — surface the exact/similar indexed problem
 - [x] CI (lint + test on PR)
 - [x] Web frontend — streaming, grounded answers, four modes
-- [x] Deployment setup — Azure VM + Docker Compose + Caddy (HTTPS), one-command provisioning, auto-deploy on merge, per-visitor rate limit
-- [ ] Public deployment live
+- [x] Deployment — Docker Compose + Caddy (HTTPS), one-command provisioning, auto-deploy on merge, per-visitor rate limit
+- [x] Public deployment live: **[tutor.lucifer07o.tech](https://tutor.lucifer07o.tech)**
 
 Built with corpus sourced only from this project's own notes and license-clean sources — deliberately **not** scraping GeeksforGeeks or LeetCode, since both prohibit it in their ToS.

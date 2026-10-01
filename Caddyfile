@@ -1,4 +1,4 @@
-# SITE_ADDRESS comes from .env: a domain (e.g. tutor-nitin.centralindia.cloudapp.azure.com) gets HTTPS automatically;
+# SITE_ADDRESS comes from .env: a domain (e.g. tutor.example.com) gets HTTPS automatically;
 # ":80" serves plain HTTP on the server's IP address.
 {$SITE_ADDRESS::80} {
 	encode gzip

@@ -1,125 +1,124 @@
-# Deploying Tutor on Azure (free with Azure for Students)
+# Deploying Tutor
 
-The whole app runs on one small Azure server (a "virtual machine"): the website, Postgres, the Redis cache, MongoDB logs, and **Caddy**, which gives you HTTPS automatically. One script does most of the work.
+Tutor runs on a single Linux server with Docker Compose. `docker-compose.prod.yml` starts the app, Postgres + pgvector, Redis, MongoDB and [Caddy](https://caddyserver.com/), which serves the site over HTTPS with automatically renewed certificates. Only ports 80 and 443 are public; the databases stay on Docker's private network.
 
-**What it costs:** Azure for Students gives **$100 of credit for 12 months**, with no card needed. This server uses roughly **$20–25 of credit a month**, so it runs for about **4–5 months** non-stop, or longer if you stop it when you don't need it. When the credit runs out, Azure switches the server off; **it never charges you**.
+## Requirements
 
-Total time: about 30–40 minutes, done once.
+- A Linux server running **Ubuntu 22.04 or 24.04**, with **at least 2 GB RAM** (4 GB recommended) and about 20 GB of disk. Any provider works: Azure, AWS, DigitalOcean, Hetzner, etc. The live demo runs on an Azure `Standard_B2als_v2` (2 vCPU, 4 GB).
+- Inbound ports **80** and **443** open, plus **22** for SSH.
+- A **domain**, for HTTPS. Without one, the site is served over plain HTTP on the server's IP.
+- A **[Groq API key](https://console.groq.com/keys)**.
 
----
+## 1. Point your domain at the server
 
-## Part 1: Create the server
+At your DNS provider, add an **A record** for the domain you want to use (for example `tutor.example.com`), pointing to the server's public IP. Use a static IP so it doesn't change on restart. Check it with:
 
-1. Go to **https://portal.azure.com** and sign in with the account where Azure for Students is active.
-2. In the search bar at the top, type **Virtual machines** → open it → **Create** → **Azure virtual machine**.
-3. Fill in the **Basics** tab:
-   | Field | Value |
-   |---|---|
-   | Subscription | **Azure for Students** |
-   | Resource group | **Create new** → `tutor-rg` |
-   | Virtual machine name | `tutor` |
-   | Region | **(Asia Pacific) Central India** |
-   | Availability options | **No infrastructure redundancy required** |
-   | Security type | **Standard** |
-   | Image | **Ubuntu Server 24.04 LTS – x64 Gen2** |
-   | Size | click **See all sizes**, search `B1ms`, pick **Standard_B1ms** (1 vCPU, 2 GiB) → **Select** |
-   | Authentication type | **Password** |
-   | Username | `azureuser` |
-   | Password | a strong password. **Write it down**: you'll type it to log in. |
-   | Public inbound ports | **Allow selected ports** → tick **HTTP (80)**, **HTTPS (443)**, **SSH (22)** |
-
-   > If B1ms says "not available" in Central India, change the Region to **South India** or **East US** and try again. Student subscriptions don't offer every size everywhere.
-4. Click **Next: Disks** → set **OS disk type** to **Standard SSD** (cheaper, and plenty fast).
-5. Click **Next: Networking** → tick **Delete public IP and NIC when VM is deleted**.
-6. Click **Next: Management**. If **Enable auto-shutdown** is ticked, **untick it**. Otherwise Azure turns your site off every evening.
-7. Click **Review + create** → **Create**. Wait about 1 minute, then click **Go to resource**.
-
-## Part 2: Give it a web address (free, built into Azure)
-
-8. On the VM's page, next to **Public IP address**, click the IP (for example `20.193.45.67`). This opens the IP's settings.
-9. Open **Settings → Configuration**:
-   - **Assignment:** choose **Static**, so the address never changes.
-   - **DNS name label:** type something like `tutor-nitin`.
-   - Click **Save**.
-
-   Your web address is now shown under the label, for example:
-   ```
-   tutor-nitin.centralindia.cloudapp.azure.com
-   ```
-   Copy it; you'll need it in step 12.
-
-## Part 3: Set up the server (one command)
-
-10. Open **PowerShell** on your laptop and log in to the server (use your own IP from step 8):
-    ```powershell
-    ssh azureuser@20.193.45.67
-    ```
-    - It asks "Are you sure you want to continue connecting?" → type `yes`.
-    - Type the password from step 3. It stays invisible while you type; that's normal.
-11. Now you're on the server. Paste these lines and press Enter:
-    ```bash
-    git clone https://github.com/Nitingupta0/Tutor.git
-    cd Tutor
-    bash scripts/setup-server.sh
-    ```
-    If it asks for your server password (`[sudo] password`), type it again.
-12. It asks two questions:
-    - **Groq API key:** paste your key. To paste in PowerShell, right-click.
-    - **Domain:** paste your address from step 9, for example `tutor-nitin.centralindia.cloudapp.azure.com`.
-
-    Then wait about **10–15 minutes**. It installs everything, creates a random database password on the server, starts the app and fills the database. It ends with **"Done! Open https://…"**.
-13. Open that link. 🎉
-
----
-
-## Updating the site after you change the code
-
-**By hand:** log in (step 10) and run:
 ```bash
-cd Tutor && bash scripts/update.sh
+nslookup tutor.example.com
 ```
 
-**Automatically (optional):** after this, every merge into `main` updates the site by itself.
-1. Log in to the server (step 10) and run these three lines. They create a key that only GitHub will use:
-   ```bash
-   ssh-keygen -t ed25519 -f ~/.ssh/github_deploy -N "" -C github-deploy
-   cat ~/.ssh/github_deploy.pub >> ~/.ssh/authorized_keys
-   cat ~/.ssh/github_deploy
-   ```
-   The last line prints a private key, starting `-----BEGIN OPENSSH PRIVATE KEY-----`. Select all of it, **including** the BEGIN and END lines, and copy it.
-2. On GitHub: **Nitingupta0/Tutor** → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**. Add three:
-   | Name | Value |
-   |---|---|
-   | `SERVER_HOST` | your web address from step 9 |
-   | `SERVER_USER` | `azureuser` |
-   | `SERVER_SSH_KEY` | the key you copied |
-3. Test it: **Actions** tab → **Deploy to server** → **Run workflow**.
+## 2. Set up the server
 
-## Adding your own notes (optional)
+SSH into the server and run:
 
-Your own notes stay private and never go to GitHub. From **PowerShell on your laptop** (use your IP; it asks for the server password):
-```powershell
-scp -r D:\Placement_Prep\DSA\* azureuser@20.193.45.67:~/Tutor/private-notes/
-```
-Then log in to the server (step 10) and run:
 ```bash
-cd Tutor && bash scripts/update.sh --reindex
+git clone https://github.com/Nitingupta0/Tutor.git
+cd Tutor
+bash scripts/setup-server.sh
 ```
 
-## Keeping an eye on credit
+The script asks for your Groq API key and your domain, then:
 
-- **Check your remaining credit:** go to https://www.microsoftazuresponsorships.com/balance, or search **Subscriptions** in the portal → **Azure for Students**.
-- **Pause the site when you don't need it:** open the VM → **Stop**. This stops the main cost while keeping all your data. Click **Start** to bring it back; it comes up with the same address, and the app starts by itself.
-- **When placement season is over:** open **Resource groups** → `tutor-rg` → **Delete resource group**. That removes everything.
+- installs Docker and adds 2 GB of swap
+- writes `.env`, generating a random database password **on the server** (it never leaves it)
+- builds and starts the stack (the first build takes about 10–15 minutes)
+- indexes the bundled notes and imports Codeforces problems for Fetch mode
 
-## If something goes wrong
+It's safe to run again. When it finishes, open `https://<your-domain>`. The first visit may take a minute while the certificate is issued.
 
-| What you see | What to do |
+## Updating
+
+```bash
+cd ~/Tutor && bash scripts/update.sh
+```
+
+This pulls `main`, rebuilds and restarts. Options:
+
+- `--reindex`: rebuild the notes index
+- `--codeforces`: re-import Codeforces problems
+
+### Automatic updates (optional)
+
+`.github/workflows/deploy-server.yml` runs `scripts/update.sh` over SSH after every merge to `main`. It does nothing until these repository secrets exist (**Settings → Secrets and variables → Actions**):
+
+| Secret | Value |
 |---|---|
-| `ssh` says "Connection timed out" | Check the VM is **Running**, and that step 3 allowed **SSH (22)**: VM → **Networking** should list port 22. |
-| The site doesn't load right after setup | Wait 2 minutes (HTTPS takes a moment the first time), then refresh. |
-| Certificate or "Not secure" error | Make sure you typed exactly the address from step 9 in step 12. To change it: `cd Tutor && nano .env`, fix the `SITE_ADDRESS=` line, save (Ctrl+O, Enter, Ctrl+X), then run `sudo docker compose -f docker-compose.prod.yml restart caddy`. |
-| "The tutor is having a moment" | Run `cd Tutor && sudo docker compose -f docker-compose.prod.yml logs app --tail 50` and share the output. |
-| Fetch says "No problems indexed yet" | Run `cd Tutor && bash scripts/update.sh --codeforces`. |
-| The Groq key was typed wrong | Run `cd Tutor && nano .env`, fix the `GROQ_API_KEY=` line, save, then run `bash scripts/update.sh`. |
-| Want to see what's running | `sudo docker compose -f docker-compose.prod.yml ps` |
+| `SERVER_HOST` | the server's domain or IP |
+| `SERVER_USER` | your login name on the server |
+| `SERVER_SSH_KEY` | a private key allowed to log in |
+
+To create a key just for this, run on the server:
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/github_deploy -N "" -C github-deploy
+cat ~/.ssh/github_deploy.pub >> ~/.ssh/authorized_keys
+cat ~/.ssh/github_deploy   # paste this output into SERVER_SSH_KEY
+```
+
+## Private notes (optional)
+
+Put your own `.md` / `.txt` / `.rst` notes in `~/Tutor/private-notes/` on the server. That folder is git-ignored and mounted read-only into the app. From your machine:
+
+```bash
+scp -r ./my-notes/* <user>@<server>:~/Tutor/private-notes/
+```
+
+Then, on the server:
+
+```bash
+cd ~/Tutor && bash scripts/update.sh --reindex
+```
+
+## Configuration
+
+Settings live in `~/Tutor/.env` on the server:
+
+| Variable | Purpose |
+|---|---|
+| `GROQ_API_KEY` | LLM access (required) |
+| `POSTGRES_PASSWORD` | generated by the setup script |
+| `SITE_ADDRESS` | your domain; several are comma-separated (e.g. `example.com, www.example.com`); `:80` serves HTTP on the IP |
+| `RATE_LIMIT_PER_MINUTE` | questions per visitor per minute (default 20, `0` = off) |
+
+After editing `.env`:
+
+- for `SITE_ADDRESS`, run `sudo docker compose -f docker-compose.prod.yml up -d --force-recreate caddy`
+- for anything else, run `bash scripts/update.sh`
+
+A plain `docker compose restart` does **not** re-read `.env`.
+
+## Operations
+
+All commands run from `~/Tutor`, with `C="sudo docker compose -f docker-compose.prod.yml"`:
+
+| Task | Command |
+|---|---|
+| See what's running | `$C ps` |
+| App logs | `$C logs app --tail 50` |
+| HTTPS / certificate logs | `$C logs caddy --tail 50` |
+| Back up the database | `$C exec -T postgres pg_dump -U rag rag_db > backup.sql` |
+| Stop everything | `$C down` (data is kept in Docker volumes) |
+
+## Troubleshooting
+
+| Symptom | Likely cause |
+|---|---|
+| Site unreachable | DNS not pointing at the server yet (check `nslookup`), or ports 80/443 blocked by the provider's firewall |
+| Certificate error | Domain doesn't resolve to this server, or `SITE_ADDRESS` doesn't match it. Check the Caddy logs. |
+| "The tutor is having a moment" | Usually an invalid `GROQ_API_KEY`. Check the app logs. |
+| Fetch says "No problems indexed yet" | Run `bash scripts/update.sh --codeforces` |
+| Server runs out of memory | Use a 4 GB server, or add more swap |
+
+## Lighter hosting
+
+The app also runs without Redis and MongoDB: set `REDIS_URL=` and `MONGO_URL=` to empty values, and caching and logging switch off. It can also use a hosted Postgres with pgvector (e.g. Neon) via a single `DATABASE_URL`. The app container then only needs the `Dockerfile`.
