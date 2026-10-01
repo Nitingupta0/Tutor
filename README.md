@@ -28,7 +28,7 @@ Built from zero prior Docker/RAG knowledge, ground-up: containers, vector search
 flowchart TD
     U["User question"] --> API["FastAPI · POST /ask · /ask/stream"]
     API --> C{"Redis cache hit?"}
-    C -- "yes — instant" --> CTX
+    C -- "yes" --> CTX
     C -- "no" --> EMB["Embed query — all-MiniLM-L6-v2"]
     EMB --> PG[("Postgres + pgvector")]
     PG --> TOPK["Top-k chunks by cosine distance"]
@@ -59,7 +59,7 @@ flowchart LR
     problems")]
 ```
 
-## The three modes
+## The four modes
 
 | Mode | What it does | Rule it follows |
 |---|---|---|
@@ -75,7 +75,7 @@ The three LLM modes share the same retrieval pipeline; only the system prompt se
 | Store | Job | Why not just use Postgres for everything |
 |---|---|---|
 | **Postgres + pgvector** | Source of truth for chunk text + embeddings, nearest-neighbor search | It's the only one that needs to |
-| **Redis** | Cache `query → top-k chunks` for 1 hour | A repeated question shouldn't re-embed and re-search every time — sub-millisecond cache hit vs. an embedding model call + vector search |
+| **Redis** | Cache `query → top-k chunks` for 1 hour | A repeated question shouldn't re-embed and re-search every time — a single key lookup instead of an embedding model call + vector search |
 | **MongoDB** | Log every query, its retrieved chunks, mode, and final answer | Logs are unstructured/append-only and never joined against the relational data — no reason to force them into Postgres |
 
 Redis and MongoDB are both optional at runtime: if Redis is down, retrieval just skips the cache; if MongoDB is down, logging is dropped with a warning (it runs on a background thread, so it never adds latency either).
@@ -186,7 +186,7 @@ Tutor/
 ├── Dockerfile              # app image
 ├── docker-compose.prod.yml # production stack: app, Postgres, Redis, MongoDB, Caddy (HTTPS)
 ├── Caddyfile               # HTTPS + reverse proxy
-├── DEPLOY.md               # step-by-step Azure deployment guide
+├── DEPLOY.md               # deployment guide (any Ubuntu server)
 ├── docker-compose.yml      # local Postgres+pgvector, Redis, MongoDB
 ├── requirements.txt / requirements-dev.txt
 └── .env.example
@@ -200,11 +200,11 @@ ruff check .
 pytest
 ```
 
-The tests stub out Postgres, Redis, MongoDB, Groq and the embedding model, so they run in under a second with no services up. CI runs lint and tests on every push to `main` and every pull request.
+The tests stub out Postgres, Redis, MongoDB, Groq and the embedding model, so they run in a few seconds with no services up. CI runs lint and tests on every push to `main` and every pull request.
 
 ## Deployment
 
-Runs on a single Linux server with Docker Compose. The live demo is on an Azure `Standard_B2als_v2`, but any Ubuntu server with 2 GB+ RAM works. `docker-compose.prod.yml` runs the app, Postgres + pgvector, Redis, MongoDB, and **Caddy**, which issues HTTPS certificates automatically. Only ports 80/443 are public; the databases stay on Docker's private network. `scripts/setup-server.sh` provisions a fresh server in one command and generates the database password on the server. `.github/workflows/deploy-server.yml` can update the server on every merge to `main`. Visitors are limited to 20 questions a minute (`RATE_LIMIT_PER_MINUTE`) to protect the LLM quota.
+Runs on a single Linux server with Docker Compose. The live demo runs on an Azure `Standard_B2als_v2` (Ubuntu 24.04, 4 GB RAM); other providers and sizes should work the same way. `docker-compose.prod.yml` runs the app, Postgres + pgvector, Redis, MongoDB, and **Caddy**, which issues HTTPS certificates automatically. The stack publishes only ports 80/443; the databases stay on Docker's private network. `scripts/setup-server.sh` provisions a fresh server in one command and generates the database password on the server. `.github/workflows/deploy-server.yml` can update the server on every merge to `main`. Visitors are limited to 20 questions a minute (`RATE_LIMIT_PER_MINUTE`) to protect the LLM quota.
 
 The app also accepts a single `DATABASE_URL` (e.g. a hosted Postgres such as Neon), and Redis/MongoDB can be switched off with empty URLs, for lighter hosting setups.
 
