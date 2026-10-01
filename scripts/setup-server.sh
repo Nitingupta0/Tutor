@@ -38,7 +38,7 @@ if [ -f .env ]; then
   echo ".env already exists — keeping it."
 else
   read -rp "Paste your Groq API key: " groq_key </dev/tty
-  read -rp "Your domain (e.g. tutor-nitin.centralindia.cloudapp.azure.com), or press Enter to use the IP address: " domain </dev/tty
+  read -rp "Your domain (e.g. tutor.example.com), or press Enter to use the IP address: " domain </dev/tty
   umask 077
   cat > .env <<EOF
 GROQ_API_KEY=${groq_key}
