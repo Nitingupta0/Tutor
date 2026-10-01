@@ -106,6 +106,31 @@ Then log in to the server (step 10) and run:
 cd Tutor && bash scripts/update.sh --reindex
 ```
 
+## Using your own domain (optional)
+
+For example, a free domain from the GitHub Student Pack. A subdomain such as `tutor.yourname.me` works well: it leaves the main domain free for a portfolio.
+
+1. **Point the domain at the server.** At your domain provider (for example Namecheap → **Domain List** → **Manage** → **Advanced DNS**), add a record:
+   | Type | Host | Value |
+   |---|---|---|
+   | **A Record** | `tutor` (for `tutor.yourname.me`), or `@` for the main domain | your server's IP from step 8 |
+
+   If you use `@`, delete any default "parking page" or "URL redirect" records for `@`.
+2. **Check that it points at the server.** In PowerShell on your laptop, run `nslookup tutor.yourname.me`. It should show your server's IP. This can take from a few minutes to an hour after you add the record.
+3. **Tell the server about it.** Log in to the server (step 10) and run:
+   ```bash
+   cd Tutor && nano .env
+   ```
+   Change the `SITE_ADDRESS=` line to your domain, for example `SITE_ADDRESS=tutor.yourname.me`. Save with Ctrl+O, Enter, Ctrl+X. Then run:
+   ```bash
+   sudo docker compose -f docker-compose.prod.yml up -d --force-recreate caddy
+   ```
+4. Open `https://tutor.yourname.me`. The first visit can take about a minute while the HTTPS certificate is created.
+
+To serve both the main domain and `www`, use `SITE_ADDRESS=yourname.me, www.yourname.me` and add an A record for each.
+
+If you haven't run the setup yet, do steps 1–2 first, then type your domain when the setup asks for it.
+
 ## Keeping an eye on credit
 
 - **Check your remaining credit:** go to https://www.microsoftazuresponsorships.com/balance, or search **Subscriptions** in the portal → **Azure for Students**.
@@ -118,7 +143,7 @@ cd Tutor && bash scripts/update.sh --reindex
 |---|---|
 | `ssh` says "Connection timed out" | Check the VM is **Running**, and that step 3 allowed **SSH (22)**: VM → **Networking** should list port 22. |
 | The site doesn't load right after setup | Wait 2 minutes (HTTPS takes a moment the first time), then refresh. |
-| Certificate or "Not secure" error | Make sure you typed exactly the address from step 9 in step 12. To change it: `cd Tutor && nano .env`, fix the `SITE_ADDRESS=` line, save (Ctrl+O, Enter, Ctrl+X), then run `sudo docker compose -f docker-compose.prod.yml restart caddy`. |
+| Certificate or "Not secure" error | Make sure you typed exactly the address from step 9 in step 12. To change it: `cd Tutor && nano .env`, fix the `SITE_ADDRESS=` line, save (Ctrl+O, Enter, Ctrl+X), then run `sudo docker compose -f docker-compose.prod.yml up -d --force-recreate caddy`. (A plain `restart` doesn't pick up changes to `.env`.) |
 | "The tutor is having a moment" | Run `cd Tutor && sudo docker compose -f docker-compose.prod.yml logs app --tail 50` and share the output. |
 | Fetch says "No problems indexed yet" | Run `cd Tutor && bash scripts/update.sh --codeforces`. |
 | The Groq key was typed wrong | Run `cd Tutor && nano .env`, fix the `GROQ_API_KEY=` line, save, then run `bash scripts/update.sh`. |
