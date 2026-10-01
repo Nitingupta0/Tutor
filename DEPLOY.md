@@ -1,10 +1,10 @@
 # Deploying Tutor
 
-Tutor runs on a single Linux server with Docker Compose. `docker-compose.prod.yml` starts the app, Postgres + pgvector, Redis, MongoDB and [Caddy](https://caddyserver.com/), which serves the site over HTTPS with automatically renewed certificates. Only ports 80 and 443 are public; the databases stay on Docker's private network.
+Tutor runs on a single Linux server with Docker Compose. `docker-compose.prod.yml` starts the app, Postgres + pgvector, Redis, MongoDB and [Caddy](https://caddyserver.com/), which serves the site over HTTPS with automatically renewed certificates. The stack publishes only ports 80 and 443 (open 22 separately for SSH); the databases stay on Docker's private network.
 
 ## Requirements
 
-- A Linux server running **Ubuntu 22.04 or 24.04**, with **at least 2 GB RAM** (4 GB recommended) and about 20 GB of disk. Any provider works: Azure, AWS, DigitalOcean, Hetzner, etc. The live demo runs on an Azure `Standard_B2als_v2` (2 vCPU, 4 GB).
+- A Linux server running **Ubuntu** with about 20 GB of disk and **4 GB RAM** recommended. 2 GB may work thanks to the swap the script adds, but it is untested. Tested on Ubuntu 24.04 on an Azure `Standard_B2als_v2` (2 vCPU, 4 GB); other providers (AWS, DigitalOcean, Hetzner, …) should work the same way.
 - Inbound ports **80** and **443** open, plus **22** for SSH.
 - A **domain**, for HTTPS. Without one, the site is served over plain HTTP on the server's IP.
 - A **[Groq API key](https://console.groq.com/keys)**.
@@ -31,7 +31,7 @@ The script asks for your Groq API key and your domain, then:
 
 - installs Docker and adds 2 GB of swap
 - writes `.env`, generating a random database password **on the server** (it never leaves it)
-- builds and starts the stack (the first build takes about 10–15 minutes)
+- builds and starts the stack (the first build can take 10–15 minutes)
 - indexes the bundled notes and imports Codeforces problems for Fetch mode
 
 It's safe to run again. When it finishes, open `https://<your-domain>`. The first visit may take a minute while the certificate is issued.
