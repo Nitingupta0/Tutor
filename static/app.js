@@ -448,11 +448,25 @@
   }
 
   /* ---------- the request ---------- */
+  // The last few exchanges of this session, so follow-ups ("explain step 2", "now in Python") make sense.
+  // Fetch lookups and failed replies aren't conversation; the server enforces the same limits.
+  const HISTORY_TURNS = 6, HISTORY_CHARS = 2000;
+  function historyFor(session) {
+    const turns = [];
+    for (const msg of session.messages) {
+      if (msg.mode === "fetch") continue;
+      if (msg.role === "user") turns.push({ role: "user", content: msg.text });
+      else if (msg.text && !msg.error) turns.push({ role: "assistant", content: msg.text });
+    }
+    return turns.slice(-HISTORY_TURNS).map((t) => ({ role: t.role, content: t.content.slice(0, HISTORY_CHARS) }));
+  }
+
   async function ask(q, m) {
     const myRequest = ++requestSeq;
     const session = current || startSession(q);
     current = session;
     setHash(session.id);
+    const turns = m === "fetch" ? [] : historyFor(session);   // taken before this question is recorded
     record(session, { role: "user", mode: m, text: q, at: Date.now() });
 
     setBusy(true);
@@ -479,7 +493,7 @@
     try {
       const res = await fetch("/ask/stream", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: q, mode: m }), signal: myController.signal,
+        body: JSON.stringify({ question: q, mode: m, history: turns }), signal: myController.signal,
       });
       if (!res.ok) {
         let detail = `HTTP ${res.status}`;
