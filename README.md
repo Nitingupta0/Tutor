@@ -142,6 +142,20 @@ python -m evals.retrieval --show-misses          # on the server: docker compose
 
 reports hit@1 / hit@3 / hit@5 and MRR for both modes, overall and per question kind, plus the questions each mode missed.
 
+Measured on the live deployment's index (36 questions):
+
+| mode | hit@1 | hit@3 | hit@5 | MRR |
+|---|---|---|---|---|
+| vector | 69% | 86% | 94% | 0.78 |
+| **hybrid** | **78%** | **97%** | **97%** | **0.87** |
+
+| hit@3 by kind | keyword | paraphrase | vague |
+|---|---|---|---|
+| vector | 82% | 93% | 80% |
+| **hybrid** | **100%** | **100%** | 80% |
+
+Exact terms are where hybrid helps most: vector search alone missed "rotting oranges", "edit distance" and "Kruskal minimum spanning tree" in the top 3. The one question hybrid still misses ("changing one row of my 2D Python list changes all the rows") is a gap in the notes, which mention that pitfall in a single line, rather than in the search.
+
 ## Using the API
 
 | Endpoint | Returns |
