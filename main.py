@@ -23,9 +23,19 @@ STATIC_DIR = Path(__file__).parent / "static"
 Mode = Literal["answer", "hint", "debug", "fetch"]
 
 
+class Turn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=8000)
+
+
 class Query(BaseModel):
     question: str = Field(min_length=1, max_length=8000)
     mode: Mode = "answer"
+    # Recent conversation, oldest first, so follow-ups make sense. generate.py keeps only the last few turns.
+    history: list[Turn] = Field(default_factory=list, max_length=20)
+
+    def turns(self) -> list[dict]:
+        return [t.model_dump() for t in self.history]
 
 
 app = FastAPI(title="Tutor", description="RAG-grounded DSA tutor", version="1.0.0")
@@ -92,7 +102,7 @@ def rate_limit(request: Request) -> None:
 def _run(request: Query) -> dict:
     if request.mode == "fetch":
         return {"mode": "fetch", "problems": problems.find_problems(request.question)}
-    return {"mode": request.mode, **generate.ask(request.question, request.mode)}
+    return {"mode": request.mode, **generate.ask(request.question, request.mode, request.turns())}
 
 
 @app.post("/ask", dependencies=[Depends(rate_limit)])
@@ -117,7 +127,7 @@ def ask_stream(request: Query):
                 yield _sse({"type": "problems", "problems": problems.find_problems(request.question)})
                 yield _sse({"type": "done"})
                 return
-            for event in generate.ask_stream(request.question, request.mode):
+            for event in generate.ask_stream(request.question, request.mode, request.turns()):
                 yield _sse(event)
         except Exception as exc:  # surface the failure to the client instead of dropping the stream
             logger.exception("Streaming request failed")

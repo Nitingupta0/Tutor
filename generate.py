@@ -42,6 +42,29 @@ def build_user_content(context: str, query: str) -> str:
     return f"Context:\n{context}\n\nQuestion:\n{query}"
 
 
+# Follow-ups ("explain step 2 again") need the recent conversation. It is capped here as well as in the
+# browser, so a client can't run up the LLM bill by sending a huge history.
+MAX_HISTORY_TURNS = 6        # three question/answer exchanges
+MAX_TURN_CHARS = 2000
+
+
+def clean_history(history) -> list[dict]:
+    """Keep the last few well-formed turns, each trimmed, as chat messages."""
+    turns = []
+    for turn in history or []:
+        role = turn.get("role") if isinstance(turn, dict) else getattr(turn, "role", None)
+        content = turn.get("content") if isinstance(turn, dict) else getattr(turn, "content", None)
+        if role in ("user", "assistant") and isinstance(content, str) and content.strip():
+            turns.append({"role": role, "content": content.strip()[:MAX_TURN_CHARS]})
+    return turns[-MAX_HISTORY_TURNS:]
+
+
+def retrieval_query(query: str, history: list[dict]) -> str:
+    """A follow-up on its own ("why?") retrieves nothing useful, so search with the previous question too."""
+    previous = next((t["content"] for t in reversed(history) if t["role"] == "user"), None)
+    return f"{previous}\n{query}" if previous else query
+
+
 @lru_cache(maxsize=1)
 def get_client():
     from groq import Groq
@@ -51,23 +74,24 @@ def get_client():
     return Groq(api_key=config.GROQ_API_KEY)
 
 
-def _messages(system_prompt: str, user_content: str) -> list[dict]:
+def _messages(system_prompt: str, user_content: str, history: list[dict] = ()) -> list[dict]:
     return [
         {"role": "system", "content": system_prompt},
+        *history,
         {"role": "user", "content": user_content},
     ]
 
 
-def call_llm(system_prompt: str, user_content: str) -> str:
+def call_llm(system_prompt: str, user_content: str, history: list[dict] = ()) -> str:
     response = get_client().chat.completions.create(
-        model=config.GROQ_MODEL, messages=_messages(system_prompt, user_content)
+        model=config.GROQ_MODEL, messages=_messages(system_prompt, user_content, history)
     )
     return response.choices[0].message.content
 
 
-def stream_llm(system_prompt: str, user_content: str) -> Iterator[str]:
+def stream_llm(system_prompt: str, user_content: str, history: list[dict] = ()) -> Iterator[str]:
     stream = get_client().chat.completions.create(
-        model=config.GROQ_MODEL, messages=_messages(system_prompt, user_content), stream=True
+        model=config.GROQ_MODEL, messages=_messages(system_prompt, user_content, history), stream=True
     )
     for chunk in stream:
         delta = chunk.choices[0].delta.content if chunk.choices else None
@@ -80,25 +104,28 @@ def _check_mode(mode: str) -> None:
         raise ValueError(f"Unknown mode {mode!r}; expected one of {', '.join(LLM_MODES)}")
 
 
-def ask(query: str, mode: str = "answer") -> dict:
+def ask(query: str, mode: str = "answer", history=None) -> dict:
     """Retrieve, generate and log. Returns the answer and how many passages grounded it.
 
+    `history` is the recent conversation (oldest first) so follow-up questions make sense.
     Which files the passages came from is logged to MongoDB but never returned to users."""
     _check_mode(mode)
-    chunks, cached = retrieve.search(query)
-    result = call_llm(SYSTEM_PROMPTS[mode], build_user_content(build_context(chunks), query))
+    turns = clean_history(history)
+    chunks, cached = retrieve.search(retrieval_query(query, turns))
+    result = call_llm(SYSTEM_PROMPTS[mode], build_user_content(build_context(chunks), query), turns)
     log.log_query(query, mode, chunks, result)
     return {"answer": result, "passages": len(chunks), "cached": cached}
 
 
-def ask_stream(query: str, mode: str = "answer") -> Iterator[dict]:
+def ask_stream(query: str, mode: str = "answer", history=None) -> Iterator[dict]:
     """Same as ask(), but yields events: one 'grounding', many 'token', one 'done'."""
     _check_mode(mode)
-    chunks, cached = retrieve.search(query)
+    turns = clean_history(history)
+    chunks, cached = retrieve.search(retrieval_query(query, turns))
     yield {"type": "grounding", "passages": len(chunks), "cached": cached}
 
     parts = []
-    for token in stream_llm(SYSTEM_PROMPTS[mode], build_user_content(build_context(chunks), query)):
+    for token in stream_llm(SYSTEM_PROMPTS[mode], build_user_content(build_context(chunks), query), turns):
         parts.append(token)
         yield {"type": "token", "text": token}
 

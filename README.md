@@ -105,6 +105,7 @@ uvicorn main:app --reload    # open http://127.0.0.1:8000
 `uvicorn` serves a single-page app at `/` — no build step, just `static/`.
 
 - **Four modes, one composer.** The whole interface re-tints per mode (cyan answer, amber hint, rose debug, violet fetch).
+- **Follow-ups just work.** Within a session, the tutor sees the last few exchanges, so "explain step 2 again" or "now in Python" refer to what came before. A new session starts fresh.
 - **Sessions you can come back to.** A sidebar keeps every conversation (Today / Yesterday / Previous 7 days / older); reopen, continue or delete any of them, and a reload brings you back to where you were. Sessions are stored only in the visitor's own browser (`localStorage`) — nothing is kept on the server.
 - **Readable pacing.** Answers stream in over server-sent events, with a live `retrieve → ground → reason` progress trail, but appear at a steady reading speed instead of all at once. A pace control (Calm / Normal / Fast / Instant) is remembered per browser, and "Show all" finishes an answer immediately.
 - **Your question stays in view.** Sending a question pins it to the top of the screen while the answer grows below; nothing auto-scrolls away from it. If the answer runs past the screen, a "Jump to latest" button follows it on request.
@@ -137,7 +138,7 @@ The Stack Overflow importer streams the XML, so the multi-GB dump never has to f
 | `GET /health` | `{"status": "ok"}` |
 | `GET /docs` | Interactive OpenAPI docs |
 
-Request body: `{"question": str, "mode": "answer" | "hint" | "debug" | "fetch"}`. An unknown mode gets a `422`, and a missing `GROQ_API_KEY` gets a `503` with a clear message.
+Request body: `{"question": str, "mode": "answer" | "hint" | "debug" | "fetch", "history": [{"role": "user" | "assistant", "content": str}, ...]}`. `history` is optional: the recent conversation, oldest first, so follow-up questions make sense. The server keeps only the last 6 turns, trims each to 2,000 characters, and uses the previous question as well when searching the notes. An unknown mode gets a `422`, and a missing `GROQ_API_KEY` gets a `503` with a clear message.
 
 ```bash
 curl -X POST http://127.0.0.1:8000/ask \
