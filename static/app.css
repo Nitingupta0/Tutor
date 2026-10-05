@@ -431,3 +431,55 @@ body.sb-open .sidebar { transform: none; visibility: visible; transition: transf
   border: 1px solid rgba(var(--m), .14); overflow-x: auto; overflow-y: hidden; }
 .body p > .katex-display:only-child { margin: 0; }
 .body .math-src { white-space: pre-wrap; }
+
+/* ---------- visuals: diagrams and step-by-step traces ---------- */
+.visual { margin: 1.1em 0; padding: 14px 16px 16px; border-radius: 14px; border: 1px solid rgba(var(--m), .18);
+  background: linear-gradient(180deg, rgba(var(--m), .06), rgba(5, 6, 12, .6) 70%); animation: rise .45s var(--ease); }
+.visual [hidden] { display: none !important; }
+.visual:focus-visible { outline: 2px solid rgba(var(--m), .6); outline-offset: 2px; }
+.visual figcaption { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; font-size: 13px; color: var(--muted); }
+.v-kind { font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: rgb(var(--m));
+  padding: 2px 8px; border-radius: 999px; background: rgba(var(--m), .1); }
+.v-title { color: var(--text); font-weight: 500; }
+.v-count { margin-left: auto; font: 11.5px var(--mono); color: var(--faint); }
+.visual-pending { display: flex; align-items: center; gap: 10px; margin: 1em 0; padding: 14px 16px; border-radius: 14px;
+  border: 1px dashed rgba(var(--m), .3); color: var(--muted); font-size: 13.5px; }
+.visual .visual-pending { margin: 0; border: 0; padding: 18px 0; justify-content: center; }
+.visual-pending i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(var(--m), .25);
+  border-top-color: rgb(var(--m)); animation: spin .9s linear infinite; }
+
+.diagram-canvas { overflow-x: auto; text-align: center; }
+.diagram-canvas svg { max-width: 100%; height: auto; }
+.visual-diagram.drawn .diagram-canvas svg { animation: rise .5s var(--ease); }
+
+.trace-scroll { overflow-x: auto; padding-bottom: 2px; }
+.trace-track { display: inline-block; position: relative; padding: 0 var(--cell); min-width: 100%; }
+.trace-cells { display: flex; }
+.cell { width: var(--cell); flex: none; padding: 0 2px; text-align: center; transition: opacity .3s; }
+.cell b { display: flex; align-items: center; justify-content: center; height: calc(var(--cell) + 2px); border-radius: 9px;
+  font: 500 13.5px var(--mono); color: var(--text); background: rgba(255,255,255,.04); border: 1px solid var(--line-strong);
+  transition: background .3s, border-color .3s, box-shadow .3s, transform .3s var(--ease); overflow: hidden; }
+.cell small { display: block; margin-top: 4px; font: 10px var(--mono); color: var(--faint); }
+.cell.out { opacity: .28; }
+.cell.mark b { border-color: rgb(var(--m)); background: rgba(var(--m), .16); box-shadow: 0 0 16px rgba(var(--m), .35); transform: translateY(-3px); }
+.cell.done b { border-color: rgba(134, 239, 172, .7); background: rgba(134, 239, 172, .12); }
+.cell.changed b { animation: cell-flash .6s var(--ease); }
+@keyframes cell-flash { 0% { transform: scale(1.18); background: rgba(var(--m), .35); } 100% { transform: none; } }
+
+.trace-pointers { position: relative; margin: 6px calc(-1 * var(--cell)) 0; min-height: 28px; transition: height .3s; }
+.ptr { position: absolute; top: 0; left: 0; display: flex; flex-direction: column; align-items: center;
+  font: 600 11.5px var(--mono); color: var(--pc); white-space: nowrap; transition: transform .45s var(--ease); }
+.ptr i { width: 0; height: 0; border: 5px solid transparent; border-bottom: 6px solid var(--pc); border-top: 0; margin-bottom: 1px;
+  filter: drop-shadow(0 0 4px var(--pc)); }
+
+.trace-vars { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.trace-vars:empty { display: none; }
+.trace-vars span { font: 12px var(--mono); padding: 3px 9px; border-radius: 8px; background: rgba(255,255,255,.05); border: 1px solid var(--line); }
+.trace-vars em { font-style: normal; color: var(--muted); margin-right: 6px; }
+.trace-note { margin: 10px 0 0; min-height: 1.5em; font-size: 14px; color: var(--text); }
+.trace-controls { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
+.trace-controls button { width: 32px; height: 30px; border-radius: 9px; border: 1px solid var(--line-strong);
+  background: rgba(255,255,255,.04); color: var(--text); font-size: 14px; line-height: 1; cursor: pointer; transition: background .2s, border-color .2s; }
+.trace-controls button:hover { background: rgba(var(--m), .12); border-color: rgba(var(--m), .4); }
+.trace-controls .play { width: 40px; color: rgb(var(--m)); }
+.trace-controls input[type="range"] { flex: 1; min-width: 60px; accent-color: rgb(var(--m)); }

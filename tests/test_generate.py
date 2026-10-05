@@ -40,6 +40,12 @@ def test_every_prompt_forbids_mentioning_sources(mode):
     assert "Never mention the context" in generate.SYSTEM_PROMPTS[mode]
 
 
+@pytest.mark.parametrize("mode,draws", [("answer", True), ("debug", True), ("hint", False)])
+def test_visuals_are_offered_except_in_hints(mode, draws):
+    prompt = generate.SYSTEM_PROMPTS[mode]
+    assert ("```mermaid" in prompt and "```trace" in prompt) is draws
+
+
 @pytest.mark.parametrize("mode", ["answer", "hint", "debug"])
 def test_each_mode_uses_its_own_system_prompt(stub_pipeline, mode):
     result = generate.ask("what is binary search?", mode)

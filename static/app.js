@@ -98,6 +98,210 @@
     });
   }
 
+  /* ---------- visuals ----------
+   * Two kinds of code block are drawn as pictures once an answer is complete:
+   *   ```mermaid  a diagram (flowcharts, trees, graphs), drawn by Mermaid, loaded only when first needed;
+   *   ```trace    JSON describing an algorithm stepping over an array, drawn as a playable widget.
+   * While the answer is still arriving they show a placeholder. Anything that can't be drawn stays a code block. */
+  const MERMAID_URL = "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js";
+  const VISUAL_LANGS = { mermaid: "a diagram", trace: "a step-by-step trace" };
+  const POINTER_COLORS = ["#67e8f9", "#fcd34d", "#f0abfc", "#86efac", "#fca5a5", "#a5b4fc"];
+  const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function visualBlocks(root) {
+    return $$("pre > code", root).map((code) => {
+      const lang = (/\blanguage-(mermaid|trace)\b/.exec(code.className) || [])[1];
+      return lang ? { lang, pre: code.parentElement, src: code.textContent } : null;
+    }).filter(Boolean);
+  }
+
+  function renderVisuals(root, final) {
+    for (const { lang, pre, src } of visualBlocks(root)) {
+      if (!final) {
+        pre.replaceWith(el("div", "visual-pending", `<i></i>Drawing ${VISUAL_LANGS[lang]}…`));
+        continue;
+      }
+      const widget = lang === "trace" ? traceWidget(src) : diagramWidget(src, pre);
+      if (widget) pre.replaceWith(widget);
+    }
+  }
+
+  /* diagrams */
+  let mermaidReady = null;
+  function loadMermaid() {
+    if (!mermaidReady) {
+      mermaidReady = new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = MERMAID_URL; s.async = true;
+        s.onload = () => {
+          window.mermaid.initialize({
+            startOnLoad: false, securityLevel: "strict", theme: "base", fontFamily: "Inter, system-ui, sans-serif",
+            themeVariables: {
+              darkMode: true, background: "#0b0d18", primaryColor: "#14182b", primaryTextColor: "#eceef8",
+              primaryBorderColor: "#67e8f9", lineColor: "#818cf8", secondaryColor: "#1a1530", tertiaryColor: "#0f1222",
+              fontSize: "14px",
+            },
+          });
+          resolve(window.mermaid);
+        };
+        s.onerror = () => { mermaidReady = null; reject(new Error("Mermaid failed to load")); };
+        document.head.appendChild(s);
+      });
+    }
+    return mermaidReady;
+  }
+
+  let mermaidQueue = Promise.resolve();   // Mermaid draws one diagram at a time
+  function diagramWidget(src, pre) {
+    const fig = el("figure", "visual visual-diagram");
+    fig.innerHTML = '<figcaption><span class="v-kind">Diagram</span></figcaption><div class="diagram-canvas"><div class="visual-pending"><i></i>Drawing a diagram…</div></div>';
+    const canvas = $(".diagram-canvas", fig);
+    const id = "dg-" + uid();
+    mermaidQueue = mermaidQueue.then(() => loadMermaid()).then(async (mermaid) => {
+      const { svg } = await mermaid.render(id, src.trim());
+      canvas.innerHTML = svg;
+      fig.classList.add("drawn");
+    }).catch(() => {
+      document.getElementById(id)?.remove();         // Mermaid can leave a half-drawn node behind
+      document.getElementById("d" + id)?.remove();
+      decorateCode(pre);
+      fig.replaceWith(pre);                           // show the source rather than nothing
+    });
+    return fig;
+  }
+
+  /* traces */
+  const MAX_CELLS = 40, MAX_STEPS = 60;
+  const cellText = (v) => (v === null ? "∅" : String(v)).slice(0, 8);
+  const isCell = (v) => v === null || ["number", "string", "boolean"].includes(typeof v);
+
+  // Turns the model's JSON into a clean list of steps, or null if there's nothing drawable.
+  function parseTrace(src) {
+    let t;
+    try { t = JSON.parse(src); } catch (_) { return null; }
+    if (!t || typeof t !== "object" || !Array.isArray(t.steps) || !t.steps.length) return null;
+    const okArray = (a) => Array.isArray(a) && a.length > 0 && a.length <= MAX_CELLS && a.every(isCell);
+    let array = okArray(t.array) ? t.array.map(cellText) : null;
+    const idx = (i, n, lo = 0, hi = n - 1) => Number.isInteger(i) && i >= lo && i <= hi;
+    const steps = [];
+    for (const s of t.steps.slice(0, MAX_STEPS)) {
+      if (!s || typeof s !== "object") continue;
+      if (okArray(s.array)) array = s.array.map(cellText);
+      if (!array) continue;
+      const n = array.length;
+      const pointers = Object.entries(s.pointers && typeof s.pointers === "object" ? s.pointers : {})
+        .filter(([name, i]) => name && idx(i, n, -1, n))   // -1 and n allowed: "before the start" / "past the end"
+        .slice(0, 6).map(([name, i]) => ({ name: String(name).slice(0, 10), i }));
+      const list = (v) => new Set((Array.isArray(v) ? v : []).filter((i) => idx(i, n)));
+      const active = Array.isArray(s.active) && s.active.length === 2 && s.active.every(Number.isInteger) ? s.active : null;
+      const vars = Object.entries(s.vars && typeof s.vars === "object" ? s.vars : {})
+        .filter(([, v]) => isCell(v)).slice(0, 6).map(([k, v]) => [String(k).slice(0, 16), String(v).slice(0, 24)]);
+      steps.push({ array, pointers, mark: list(s.mark), done: list(s.done), active, vars,
+                   note: typeof s.note === "string" ? s.note.slice(0, 400) : "" });
+    }
+    if (!steps.length) return null;
+    return { title: typeof t.title === "string" ? t.title.slice(0, 120) : "", steps };
+  }
+
+  function traceWidget(src) {
+    const trace = parseTrace(src);
+    if (!trace) return null;
+    const { steps } = trace;
+    const width = Math.max(...steps.map((s) => s.array.length));
+    const colors = {};
+    steps.forEach((s) => s.pointers.forEach((p) => { colors[p.name] ??= POINTER_COLORS[Object.keys(colors).length % POINTER_COLORS.length]; }));
+
+    const fig = el("figure", "visual visual-trace");
+    fig.tabIndex = 0;
+    fig.setAttribute("aria-label", `Step-by-step trace${trace.title ? ": " + trace.title : ""}. Use the arrow keys to step.`);
+    fig.style.setProperty("--cell", width <= 12 ? "44px" : width <= 20 ? "34px" : "28px");
+    fig.innerHTML = `
+      <figcaption><span class="v-kind">Trace</span><span class="v-title"></span><span class="v-count"></span></figcaption>
+      <div class="trace-scroll"><div class="trace-track"><div class="trace-cells"></div><div class="trace-pointers"></div></div></div>
+      <div class="trace-vars"></div>
+      <p class="trace-note" aria-live="polite"></p>
+      <div class="trace-controls">
+        <button type="button" data-act="first" aria-label="First step">⏮</button>
+        <button type="button" data-act="prev" aria-label="Previous step">‹</button>
+        <button type="button" data-act="play" class="play" aria-label="Play">▶</button>
+        <button type="button" data-act="next" aria-label="Next step">›</button>
+        <input type="range" min="0" max="${steps.length - 1}" value="0" aria-label="Step">
+      </div>`;
+    $(".v-title", fig).textContent = trace.title;
+    const cellsEl = $(".trace-cells", fig), ptrsEl = $(".trace-pointers", fig);
+    const slider = $("input", fig), playBtn = $(".play", fig);
+    if (steps.length === 1) $(".trace-controls", fig).hidden = true;
+
+    const cells = [], ptrs = {};
+    let at = -1, timer = 0;
+
+    function show(k) {
+      k = Math.max(0, Math.min(steps.length - 1, k));
+      const s = steps[k], prev = steps[at];
+      while (cells.length < s.array.length) {
+        const c = el("div", "cell", `<b></b><small>${cells.length}</small>`);
+        cellsEl.appendChild(c); cells.push(c);
+      }
+      cells.forEach((c, i) => {
+        const has = i < s.array.length;
+        c.hidden = !has;
+        if (!has) return;
+        const v = $("b", c);
+        if (v.textContent !== s.array[i]) {
+          v.textContent = s.array[i];
+          if (prev && !reducedMotion()) { c.classList.remove("changed"); void c.offsetWidth; c.classList.add("changed"); }
+        }
+        const out = s.active && (i < Math.min(...s.active) || i > Math.max(...s.active));
+        c.classList.toggle("out", !!out);
+        c.classList.toggle("mark", s.mark.has(i));
+        c.classList.toggle("done", s.done.has(i));
+      });
+      // Pointers slide between cells; several on one cell stack downwards.
+      const stack = {};
+      for (const name in ptrs) ptrs[name].hidden = true;
+      for (const p of s.pointers) {
+        if (!ptrs[p.name]) {
+          const node = el("span", "ptr", `<i></i>${esc(p.name)}`);
+          node.style.setProperty("--pc", colors[p.name]);
+          ptrsEl.appendChild(node); ptrs[p.name] = node;
+        }
+        const row = stack[p.i] = (stack[p.i] ?? -1) + 1;
+        const node = ptrs[p.name];
+        node.hidden = false;
+        node.style.transform = `translate(calc(var(--cell) * ${p.i + 1.5} - 50%), ${row * 22}px)`;
+      }
+      ptrsEl.style.height = `${(Math.max(-1, ...Object.values(stack)) + 1) * 22 + 6}px`;
+      $(".trace-vars", fig).innerHTML = s.vars.map(([k, v]) => `<span><em>${esc(k)}</em>${esc(v)}</span>`).join("");
+      $(".trace-note", fig).textContent = s.note;
+      $(".v-count", fig).textContent = steps.length > 1 ? `step ${k + 1} / ${steps.length}` : "";
+      slider.value = k;
+      at = k;
+      if (at === steps.length - 1) pause();
+    }
+    function pause() { clearInterval(timer); timer = 0; playBtn.textContent = "▶"; playBtn.setAttribute("aria-label", "Play"); }
+    function play() {
+      if (at === steps.length - 1) show(0);
+      // Stops by itself once the widget leaves the page (new session, answer redrawn).
+      timer = setInterval(() => (fig.isConnected ? show(at + 1) : pause()), 1300);
+      playBtn.textContent = "❚❚"; playBtn.setAttribute("aria-label", "Pause");
+    }
+    const act = { first: () => show(0), prev: () => show(at - 1), next: () => show(at + 1), play: () => (timer ? pause() : play()) };
+    fig.addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-act]");
+      if (!b) return;
+      if (b.dataset.act !== "play") pause();
+      act[b.dataset.act]();
+    });
+    slider.addEventListener("input", () => { pause(); show(+slider.value); });
+    fig.addEventListener("keydown", (e) => {
+      if (e.target === slider) return;
+      const k = { ArrowLeft: "prev", ArrowRight: "next", Home: "first", " ": "play" }[e.key];
+      if (k) { e.preventDefault(); if (k !== "play") pause(); act[k](); }
+    });
+    show(0);
+    return fig;
+  }
+
   /* ---------- storage (always guarded: private windows and full quotas must not break the page) ---------- */
   function readJSON(key, fallback) {
     try { const v = JSON.parse(localStorage.getItem(key)); return v ?? fallback; } catch (_) { return fallback; }
@@ -357,6 +561,7 @@
     if (msg.mode === "fetch") { renderProblems(ui, msg.problems || []); return; }
 
     ui.content.innerHTML = msg.text ? markdown(msg.text) : '<p class="empty">The tutor had nothing to say — try rephrasing.</p>';
+    renderVisuals(ui.content, true);   // anything that can't be drawn (e.g. cut off mid-way) stays a code block
     decorateCode(ui.content);
     if (msg.stopped) ui.card.appendChild(el("div", "stopped-note", "Stopped before the answer finished."));
     renderGrounding(ui, msg.passages);
@@ -394,6 +599,7 @@
 
     function paint() {
       ui.content.innerHTML = markdown(target.slice(0, shown));
+      renderVisuals(ui.content, false);
       const lastNode = ui.content.lastElementChild || ui.content;
       lastNode.insertAdjacentHTML("beforeend", '<span class="caret"></span>');
       updateJump();
