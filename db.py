@@ -1,8 +1,12 @@
 """Postgres + pgvector connection helper and schema bootstrap."""
+import logging
+
 import psycopg2
 from pgvector.psycopg2 import register_vector
 
 import config
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = f"""
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -50,11 +54,31 @@ def connect():
     return conn
 
 
+# Added after the first release. Each one is idempotent, so init_schema() can run on every start and upgrade
+# an existing database in place. One that fails (e.g. an old pgvector without HNSW) is skipped, not fatal.
+UPGRADES = [
+    # Keyword search: a stemmed full-text vector kept in sync by Postgres, plus its index.
+    "ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS content_tsv tsvector "
+    "GENERATED ALWAYS AS (to_tsvector('english', content)) STORED",
+    "CREATE INDEX IF NOT EXISTS document_chunks_tsv_idx ON document_chunks USING gin (content_tsv)",
+    # Approximate nearest-neighbour indexes, so vector search doesn't scan every row as the corpus grows.
+    "CREATE INDEX IF NOT EXISTS document_chunks_embedding_hnsw ON document_chunks USING hnsw (embedding vector_cosine_ops)",
+    "CREATE INDEX IF NOT EXISTS problems_embedding_hnsw ON problems USING hnsw (embedding vector_cosine_ops)",
+]
+
+
 def init_schema() -> None:
     conn = connect()
     with conn.cursor() as cur:
         cur.execute(SCHEMA)
-    conn.commit()
+        conn.commit()
+        for statement in UPGRADES:
+            try:
+                cur.execute(statement)
+                conn.commit()
+            except psycopg2.Error as exc:
+                conn.rollback()
+                logger.warning("Schema upgrade skipped (%s): %s", statement.split(" ON ")[0][:60], exc)
     conn.close()
 
 

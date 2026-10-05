@@ -5,6 +5,7 @@ import re
 import threading
 import time
 from collections import defaultdict, deque
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
 
@@ -14,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 import config
+import db
 import generate
 import problems
 
@@ -38,7 +40,17 @@ class Query(BaseModel):
         return [t.model_dump() for t in self.history]
 
 
-app = FastAPI(title="Tutor", description="RAG-grounded DSA tutor", version="1.0.0")
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Bring an existing database up to the current schema (new columns and indexes) on every start.
+    try:
+        db.init_schema()
+    except Exception as exc:  # the app still serves the UI and reports errors per request if the DB is down
+        logger.warning("Could not prepare the database schema at startup: %s", exc)
+    yield
+
+
+app = FastAPI(title="Tutor", description="RAG-grounded DSA tutor", version="1.0.0", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
