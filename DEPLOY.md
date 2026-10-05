@@ -106,6 +106,7 @@ All commands run from `~/Tutor`, with `C="sudo docker compose -f docker-compose.
 | See what's running | `$C ps` |
 | App logs | `$C logs app --tail 50` |
 | HTTPS / certificate logs | `$C logs caddy --tail 50` |
+| Measure search quality | `$C exec app python -m evals.retrieval --show-misses` |
 | Back up the database | `$C exec -T postgres pg_dump -U rag rag_db > backup.sql` |
 | Stop everything | `$C down` (data is kept in Docker volumes) |
 

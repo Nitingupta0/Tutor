@@ -129,6 +129,18 @@ Everything goes through `ingest.py`, which accepts any folder of `.md`, `.txt` o
 
 The Stack Overflow importer streams the XML, so the multi-GB dump never has to fit in memory. It keeps questions with an accepted answer, a matching tag, and a minimum score, and writes each one as a Markdown note that links back to the question and carries its license. The Codeforces importer stores metadata only (id, title, tags, rating and a link to the statement), which is all `fetch` needs.
 
+## Search quality
+
+Retrieval is **hybrid** by default: Postgres full-text search (stemmed keywords, so `lower_bound` or "Kruskal" match exactly) and pgvector similarity (meaning, so paraphrases match) each rank candidates, and the two rankings are merged with reciprocal rank fusion. Vector search uses an HNSW index. Set `SEARCH_MODE=vector` to compare against pure embedding search.
+
+It is measured, not assumed: `evals/retrieval_set.jsonl` holds 36 questions (keyword, paraphrase and vague phrasings), each labelled with the note that should come back, and
+
+```bash
+python -m evals.retrieval --show-misses          # on the server: docker compose -f docker-compose.prod.yml exec app python -m evals.retrieval
+```
+
+reports hit@1 / hit@3 / hit@5 and MRR for both modes, overall and per question kind, plus the questions each mode missed.
+
 ## Using the API
 
 | Endpoint | Returns |

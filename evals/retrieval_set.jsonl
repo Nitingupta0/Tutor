@@ -1,0 +1,36 @@
+{"q": "How do I find the first index where a[i] >= target in a sorted array?", "expect": ["binary-search.md"], "kind": "paraphrase"}
+{"q": "lower_bound loops forever when lo equals hi", "expect": ["binary-search.md"], "kind": "keyword"}
+{"q": "minimum capacity of a ship to deliver all packages within D days", "expect": ["binary-search.md"], "kind": "paraphrase"}
+{"q": "Koko eating bananas", "expect": ["binary-search.md"], "kind": "keyword"}
+{"q": "check whether two numbers in a sorted list add up to a value without nested loops", "expect": ["two-pointers-and-sliding-window.md"], "kind": "paraphrase"}
+{"q": "3Sum without duplicate triplets", "expect": ["two-pointers-and-sliding-window.md"], "kind": "keyword"}
+{"q": "longest substring without repeating characters", "expect": ["two-pointers-and-sliding-window.md"], "kind": "keyword"}
+{"q": "why does shrinking the window break when the array has negative numbers", "expect": ["two-pointers-and-sliding-window.md", "hashing-and-prefix-sums.md"], "kind": "vague"}
+{"q": "count how many subarrays add up to exactly k", "expect": ["hashing-and-prefix-sums.md", "two-pointers-and-sliding-window.md"], "kind": "paraphrase"}
+{"q": "answer many range sum queries quickly after some preprocessing", "expect": ["hashing-and-prefix-sums.md"], "kind": "paraphrase"}
+{"q": "add a value to every element between l and r many times efficiently", "expect": ["hashing-and-prefix-sums.md"], "kind": "paraphrase"}
+{"q": "Two Sum on an unsorted array", "expect": ["hashing-and-prefix-sums.md"], "kind": "keyword"}
+{"q": "sum of a rectangle inside a matrix in constant time", "expect": ["hashing-and-prefix-sums.md"], "kind": "paraphrase"}
+{"q": "fewest moves to reach a cell in a grid where every step costs the same", "expect": ["graphs-bfs-dfs.md"], "kind": "paraphrase"}
+{"q": "rotting oranges", "expect": ["graphs-bfs-dfs.md"], "kind": "keyword"}
+{"q": "detect a cycle in a directed graph", "expect": ["graphs-bfs-dfs.md"], "kind": "keyword"}
+{"q": "in what order should I take courses that have prerequisites", "expect": ["graphs-bfs-dfs.md"], "kind": "paraphrase"}
+{"q": "number of islands", "expect": ["graphs-bfs-dfs.md"], "kind": "keyword"}
+{"q": "my BFS gives wrong distances once edges have different costs", "expect": ["graphs-bfs-dfs.md"], "kind": "vague"}
+{"q": "fewest coins to make an amount", "expect": ["dynamic-programming.md"], "kind": "paraphrase"}
+{"q": "edit distance between two strings", "expect": ["dynamic-programming.md"], "kind": "keyword"}
+{"q": "0/1 knapsack with a one-dimensional array", "expect": ["dynamic-programming.md"], "kind": "keyword"}
+{"q": "my recursive solution is exponential because it keeps solving the same thing again", "expect": ["dynamic-programming.md"], "kind": "vague"}
+{"q": "keep the k biggest values from a stream using little memory", "expect": ["heaps-and-greedy.md"], "kind": "paraphrase"}
+{"q": "running median of a stream", "expect": ["heaps-and-greedy.md"], "kind": "keyword"}
+{"q": "merge k sorted lists", "expect": ["heaps-and-greedy.md"], "kind": "keyword"}
+{"q": "how can I tell if taking the locally best choice gives the optimal answer", "expect": ["heaps-and-greedy.md"], "kind": "vague"}
+{"q": "how many meeting rooms are needed", "expect": ["heaps-and-greedy.md"], "kind": "keyword"}
+{"q": "for each element find the next larger value to its right", "expect": ["stacks-and-union-find.md"], "kind": "paraphrase"}
+{"q": "largest rectangle in a histogram", "expect": ["stacks-and-union-find.md"], "kind": "keyword"}
+{"q": "find the edge that creates a cycle when building an undirected graph", "expect": ["stacks-and-union-find.md"], "kind": "paraphrase"}
+{"q": "Kruskal minimum spanning tree", "expect": ["stacks-and-union-find.md"], "kind": "keyword"}
+{"q": "n is up to 10^5, what time complexity do I need", "expect": ["complexity-and-framework.md"], "kind": "keyword"}
+{"q": "roughly how many simple operations run in one second", "expect": ["complexity-and-framework.md"], "kind": "paraphrase"}
+{"q": "changing one row of my 2D Python list changes all the rows", "expect": ["complexity-and-framework.md"], "kind": "vague"}
+{"q": "integer overflow when computing the middle index", "expect": ["binary-search.md", "complexity-and-framework.md"], "kind": "keyword"}

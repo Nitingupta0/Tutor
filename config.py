@@ -30,3 +30,7 @@ GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 EMBEDDING_DIM = 384
 TOP_K = int(os.getenv("TOP_K", "5"))
+
+# "hybrid" fuses keyword (Postgres full-text) and vector rankings; "vector" is pure embedding similarity.
+SEARCH_MODE = os.getenv("SEARCH_MODE", "hybrid")
+RRF_K = 60   # reciprocal-rank-fusion constant: higher flattens the gap between rank 1 and rank 10
