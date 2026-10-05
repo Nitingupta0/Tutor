@@ -105,7 +105,9 @@ uvicorn main:app --reload    # open http://127.0.0.1:8000
 `uvicorn` serves a single-page app at `/` — no build step, just `static/`.
 
 - **Four modes, one composer.** The whole interface re-tints per mode (cyan answer, amber hint, rose debug, violet fetch).
-- **Streams token by token** over server-sent events, with a live `retrieve → ground → reason` progress trail.
+- **Sessions you can come back to.** A sidebar keeps every conversation (Today / Yesterday / Previous 7 days / older); reopen, continue or delete any of them, and a reload brings you back to where you were. Sessions are stored only in the visitor's own browser (`localStorage`) — nothing is kept on the server.
+- **Readable pacing.** Answers stream in over server-sent events, with a live `retrieve → ground → reason` progress trail, but appear at a steady reading speed instead of all at once. A pace control (Calm / Normal / Fast / Instant) is remembered per browser, and "Show all" finishes an answer immediately.
+- **Your question stays in view.** Sending a question pins it to the top of the screen while the answer grows below; nothing auto-scrolls away from it. If the answer runs past the screen, a "Jump to latest" button follows it on request.
 - **Grounded, not leaky.** Each answer notes how many passages it was grounded in, but never which files. Your notes stay internal, and the LLM is told not to cite them either. (Full sources are still logged to MongoDB for debugging.)
 - **Knowledge constellation.** The background is a field of "chunks"; each question drops a probe that locks onto its top-k neighbours, mirroring the vector search running on the server.
 - **Hint mode keeps its promise** — the full answer is one deliberate click away ("Reveal the full answer"), never the default.
