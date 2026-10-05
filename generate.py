@@ -30,9 +30,19 @@ NO_SOURCES_RULE = """
 VISUALS_RULE = """
         When a picture genuinely makes the idea clearer, add one visual (two at most). Most
         replies need none, and never draw what the text already makes obvious.
-        - Structure or flow (trees, graphs, recursion calls, state machines, decisions): a
-          ```mermaid code block with a flowchart (flowchart TD or LR), at most about 15 nodes.
-          Put labels containing symbols in quotes, e.g. A["mid = (lo + hi) / 2"].
+        - A tree (recursion tree, BST, heap, trie): a ```tree code block with one node per line
+          and each child indented two spaces more than its parent; write "-" for a missing
+          child. Write every call or node on its own line, even when the same label repeats,
+          and check it against the algorithm, e.g. for fib(3):
+          fib(3)
+            fib(2)
+              fib(1)
+              fib(0)
+            fib(1)
+        - Other structure or flow (graphs, state machines, decisions): a ```mermaid code block
+          with a flowchart (flowchart TD or LR), at most about 15 nodes. Give every node its
+          own id even when labels repeat, and put labels containing symbols in quotes, e.g.
+          A["mid = (lo + hi) / 2"].
         - An algorithm moving over an array (binary search, two pointers, sliding window, a
           sorting pass, prefix sums): a ```trace code block containing only JSON, shaped like
           {"title": "Binary search for 7", "array": [1, 3, 5, 7, 9],
