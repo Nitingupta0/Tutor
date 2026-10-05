@@ -25,10 +25,29 @@ NO_SOURCES_RULE = """
         Never mention the context, your notes, sources, documents or file names in your
         reply — explain things directly, as your own knowledge."""
 
+# The page draws these two kinds of code block as pictures (static/app.js). Hints stay picture-free:
+# a step-by-step trace would give the answer away.
+VISUALS_RULE = """
+        When a picture genuinely makes the idea clearer, add one visual (two at most). Most
+        replies need none, and never draw what the text already makes obvious.
+        - Structure or flow (trees, graphs, recursion calls, state machines, decisions): a
+          ```mermaid code block with a flowchart (flowchart TD or LR), at most about 15 nodes.
+          Put labels containing symbols in quotes, e.g. A["mid = (lo + hi) / 2"].
+        - An algorithm moving over an array (binary search, two pointers, sliding window, a
+          sorting pass, prefix sums): a ```trace code block containing only JSON, shaped like
+          {"title": "Binary search for 7", "array": [1, 3, 5, 7, 9],
+           "steps": [{"pointers": {"lo": 0, "mid": 2, "hi": 4}, "active": [0, 4], "mark": [2],
+                      "done": [], "vars": {"a[mid]": 5}, "note": "5 < 7, so the answer is right of mid"}]}
+          pointers map a short name to an index; active is the inclusive index range still in
+          play; mark highlights the cells being looked at; done marks finished cells; vars shows
+          a few running values; a step may carry its own "array" when values change (a swap).
+          Use a small example (at most 12 elements, 10 steps) and make every step correct.
+        Explain in words as well: a visual supports the explanation, it never replaces it."""
+
 SYSTEM_PROMPTS = {
-    "answer": ANSWER_PROMPT + NO_SOURCES_RULE,
+    "answer": ANSWER_PROMPT + NO_SOURCES_RULE + VISUALS_RULE,
     "hint": HINT_PROMPT + NO_SOURCES_RULE,
-    "debug": DEBUG_PROMPT + NO_SOURCES_RULE,
+    "debug": DEBUG_PROMPT + NO_SOURCES_RULE + VISUALS_RULE,
 }
 LLM_MODES = tuple(SYSTEM_PROMPTS)
 

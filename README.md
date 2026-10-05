@@ -111,6 +111,7 @@ uvicorn main:app --reload    # open http://127.0.0.1:8000
 - **Your question stays in view.** Sending a question pins it to the top of the screen while the answer grows below; nothing auto-scrolls away from it. If the answer runs past the screen, a "Jump to latest" button follows it on request.
 - **Grounded, not leaky.** Each answer notes how many passages it was grounded in, but never which files. Your notes stay internal, and the LLM is told not to cite them either. (Full sources are still logged to MongoDB for debugging.)
 - **Knowledge constellation.** The background is a field of "chunks"; each question drops a probe that locks onto its top-k neighbours, mirroring the vector search running on the server.
+- **Pictures when they help.** In answer and debug mode the tutor can draw a **diagram** (flowcharts, trees, graphs, recursion; rendered with Mermaid, which is only downloaded when a diagram appears) or a **step-by-step trace** of an algorithm moving over an array: cells, sliding `lo` / `mid` / `hi` pointers, the range still in play, running values and a note per step, with play / step / scrub controls and arrow keys. It is told to add one only when it genuinely makes the idea clearer, and anything it can't draw is shown as plain text. Maths is typeset with KaTeX.
 - **Hint mode keeps its promise** — the full answer is one deliberate click away ("Reveal the full answer"), never the default.
 - `fetch` results link to the problem, with its rating and a similarity meter. Debug mode switches the input to monospace and `Ctrl+Enter` to send, so pasting code is painless.
 
@@ -236,7 +237,7 @@ Deployment guide: **[DEPLOY.md](DEPLOY.md)**.
 - [x] Corpus expansion — bundled notes, official-docs loader, Codeforces public API, Stack Overflow dump
 - [x] `fetch` mode — surface the exact/similar indexed problem
 - [x] CI (lint + test on PR)
-- [x] Web frontend — streaming, grounded answers, four modes
+- [x] Web frontend — streaming, grounded answers, four modes, sessions, follow-ups, maths, diagrams and step-by-step traces
 - [x] Deployment — Docker Compose + Caddy (HTTPS), one-command provisioning, auto-deploy on merge, per-visitor rate limit
 - [x] Public deployment live: **[tutor.lucifer07o.tech](https://tutor.lucifer07o.tech)**
 
