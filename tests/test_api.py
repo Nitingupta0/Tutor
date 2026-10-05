@@ -49,6 +49,20 @@ def test_home_serves_the_ui(client):
     assert "constellation" in r.text
 
 
+def test_home_is_revalidated_and_assets_are_versioned(client):
+    import hashlib
+    import re
+
+    r = client.get("/")
+    assert r.headers["cache-control"] == "no-cache"
+    stamped = dict(re.findall(r'/static/(app\.js|app\.css|constellation\.js)\?v=([0-9a-f]{10})', r.text))
+    assert set(stamped) == {"app.js", "app.css", "constellation.js"}
+    for name, version in stamped.items():
+        assert version == hashlib.sha256((main.STATIC_DIR / name).read_bytes()).hexdigest()[:10]
+        assert client.get(f"/static/{name}?v={version}").status_code == 200
+    assert "cdn.jsdelivr.net" in r.text  # external URLs are left alone
+
+
 def test_static_assets(client):
     for path in ("/static/app.js", "/static/app.css", "/static/constellation.js"):
         assert client.get(path).status_code == 200
