@@ -1,5 +1,7 @@
+import hashlib
 import json
 import logging
+import re
 import threading
 import time
 from collections import defaultdict, deque
@@ -7,7 +9,7 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -30,9 +32,24 @@ app = FastAPI(title="Tutor", description="RAG-grounded DSA tutor", version="1.0.
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
+_ASSET = re.compile(r"/static/([\w./-]+\.(?:js|css))")
+
+
+def _versioned(match: re.Match) -> str:
+    """/static/app.js -> /static/app.js?v=<content hash>, so each deploy gets fresh URLs."""
+    path = STATIC_DIR / match.group(1)
+    if not path.is_file():
+        return match.group(0)
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()[:10]
+    return f"/static/{match.group(1)}?v={digest}"
+
+
 @app.get("/", include_in_schema=False)
 def home():
-    return FileResponse(STATIC_DIR / "index.html")
+    # The page is small and always revalidated; the scripts it points to change URL whenever their content
+    # changes, so browsers never run a stale app.js / app.css after a deploy.
+    html = _ASSET.sub(_versioned, (STATIC_DIR / "index.html").read_text(encoding="utf-8"))
+    return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/health")
