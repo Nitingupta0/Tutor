@@ -47,9 +47,44 @@
   function el(tag, cls, html) { const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; }
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
+  /* ---------- maths ----------
+   * The model writes LaTeX: \[ … \] or $$ … $$ for display, \( … \) or $ … $ inline. Markdown would eat the
+   * backslashes, so formulas are swapped for placeholders first, typeset with KaTeX, and put back afterwards.
+   * Code (fenced or inline) is left alone, and "$5 and $10" stays text: inline $…$ needs no space just inside
+   * the dollars and no digit right after the closing one. */
+  const MATH_TOKEN = (i) => `%%KTX${i}%%`;
+
+  function renderMath(src, display) {
+    if (window.katex) {
+      try { return katex.renderToString(src.trim(), { displayMode: display, throwOnError: false, output: "htmlAndMathml" }); }
+      catch (_) { /* fall through to plain text */ }
+    }
+    return display ? `<pre class="math-src">${esc(src.trim())}</pre>` : `<code>${esc(src.trim())}</code>`;
+  }
+
+  function protectMath(text, store) {
+    const keep = (src, display) => {
+      store.push(renderMath(src, display));
+      const token = MATH_TOKEN(store.length - 1);
+      return display ? `\n\n${token}\n\n` : token;
+    };
+    // Odd-numbered parts are code: ``` fenced (possibly still open while streaming) or `inline`.
+    return text.split(/(```[\s\S]*?(?:```|$)|`[^`\n]*`)/g).map((part, i) => i % 2 ? part : part
+      .replace(/\$\$([\s\S]+?)\$\$/g, (_, m) => keep(m, true))
+      .replace(/\\\[([\s\S]+?)\\\]/g, (_, m) => keep(m, true))
+      .replace(/\\\(([\s\S]+?)\\\)/g, (_, m) => keep(m, false))
+      .replace(/(^|[^\\$\w])\$(?!\s)([^$\n]+?)(?<!\s)\$(?![\d$\w])/g, (_, pre, m) => pre + keep(m, false))
+    ).join("");
+  }
+
   function markdown(text) {
-    if (window.marked && window.DOMPurify) return DOMPurify.sanitize(marked.parse(text, { breaks: false, gfm: true }));
-    return `<p style="white-space:pre-wrap">${esc(text)}</p>`;
+    const math = [];
+    const prepared = protectMath(text, math);
+    const html = window.marked && window.DOMPurify
+      ? DOMPurify.sanitize(marked.parse(prepared, { breaks: false, gfm: true }))
+      : `<p style="white-space:pre-wrap">${esc(prepared)}</p>`;
+    // KaTeX output is generated from escaped text by KaTeX itself, so it is inserted after sanitizing.
+    return math.length ? html.replace(/%%KTX(\d+)%%/g, (t, i) => math[+i] ?? t) : html;
   }
   function decorateCode(root) {
     $$("pre code", root).forEach((code) => {

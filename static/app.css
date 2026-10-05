@@ -424,3 +424,10 @@ body.sb-open .sidebar { transform: none; visibility: visible; transition: transf
 .jump:hover { border-color: rgb(var(--accent-rgb)); }
 .stopped-note { margin-top: 12px; font-size: 12.5px; color: var(--faint); font-style: italic; }
 @media (min-width: 1180px) { body.sb-open #newSession { display: none; } }
+
+/* ---------- maths (KaTeX) ---------- */
+.body .katex { font-size: 1.08em; color: var(--text); }
+.body .katex-display { margin: .9em 0; padding: 12px 14px; border-radius: 12px; background: rgba(var(--m), .05);
+  border: 1px solid rgba(var(--m), .14); overflow-x: auto; overflow-y: hidden; }
+.body p > .katex-display:only-child { margin: 0; }
+.body .math-src { white-space: pre-wrap; }
