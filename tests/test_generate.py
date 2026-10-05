@@ -43,7 +43,8 @@ def test_every_prompt_forbids_mentioning_sources(mode):
 @pytest.mark.parametrize("mode,draws", [("answer", True), ("debug", True), ("hint", False)])
 def test_visuals_are_offered_except_in_hints(mode, draws):
     prompt = generate.SYSTEM_PROMPTS[mode]
-    assert ("```mermaid" in prompt and "```trace" in prompt) is draws
+    assert all(f"```{kind}" in prompt for kind in ("mermaid", "tree", "trace")) is draws
+    assert not any(f"```{kind}" in prompt for kind in ("mermaid", "tree", "trace")) or draws
 
 
 @pytest.mark.parametrize("mode", ["answer", "hint", "debug"])

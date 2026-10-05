@@ -99,18 +99,19 @@
   }
 
   /* ---------- visuals ----------
-   * Two kinds of code block are drawn as pictures once an answer is complete:
-   *   ```mermaid  a diagram (flowcharts, trees, graphs), drawn by Mermaid, loaded only when first needed;
+   * Three kinds of code block are drawn as pictures once an answer is complete:
+   *   ```mermaid  a diagram (flowcharts, graphs), drawn by Mermaid, loaded only when first needed;
+   *   ```tree     an indented outline (recursion trees, BSTs, heaps), turned into a Mermaid diagram here;
    *   ```trace    JSON describing an algorithm stepping over an array, drawn as a playable widget.
    * While the answer is still arriving they show a placeholder. Anything that can't be drawn stays a code block. */
   const MERMAID_URL = "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js";
-  const VISUAL_LANGS = { mermaid: "a diagram", trace: "a step-by-step trace" };
+  const VISUAL_LANGS = { mermaid: "a diagram", tree: "a tree", trace: "a step-by-step trace" };
   const POINTER_COLORS = ["#67e8f9", "#fcd34d", "#f0abfc", "#86efac", "#fca5a5", "#a5b4fc"];
   const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   function visualBlocks(root) {
     return $$("pre > code", root).map((code) => {
-      const lang = (/\blanguage-(mermaid|trace)\b/.exec(code.className) || [])[1];
+      const lang = (/\blanguage-(mermaid|tree|trace)\b/.exec(code.className) || [])[1];
       return lang ? { lang, pre: code.parentElement, src: code.textContent } : null;
     }).filter(Boolean);
   }
@@ -121,7 +122,8 @@
         pre.replaceWith(el("div", "visual-pending", `<i></i>Drawing ${VISUAL_LANGS[lang]}…`));
         continue;
       }
-      const widget = lang === "trace" ? traceWidget(src) : diagramWidget(src, pre);
+      const diagram = lang === "tree" ? treeToMermaid(src) : src;
+      const widget = lang === "trace" ? traceWidget(src) : diagram && diagramWidget(diagram, pre, lang === "tree" ? "Tree" : "Diagram");
       if (widget) pre.replaceWith(widget);
     }
   }
@@ -152,9 +154,9 @@
   }
 
   let mermaidQueue = Promise.resolve();   // Mermaid draws one diagram at a time
-  function diagramWidget(src, pre) {
+  function diagramWidget(src, pre, kind) {
     const fig = el("figure", "visual visual-diagram");
-    fig.innerHTML = '<figcaption><span class="v-kind">Diagram</span></figcaption><div class="diagram-canvas"><div class="visual-pending"><i></i>Drawing a diagram…</div></div>';
+    fig.innerHTML = `<figcaption><span class="v-kind">${kind}</span></figcaption><div class="diagram-canvas"><div class="visual-pending"><i></i>Drawing a diagram…</div></div>`;
     const canvas = $(".diagram-canvas", fig);
     const id = "dg-" + uid();
     mermaidQueue = mermaidQueue.then(() => loadMermaid()).then(async (mermaid) => {
@@ -168,6 +170,29 @@
       fig.replaceWith(pre);                           // show the source rather than nothing
     });
     return fig;
+  }
+
+  /* trees: one node per line, children indented under their parent; a line "-" is an empty child.
+   * Repeated labels (fib(1) appears again and again in a recursion tree) are separate nodes, because the ids
+   * are made up here instead of by the model, which tends to reuse or mix them up. */
+  const MAX_TREE_NODES = 80;
+  function treeToMermaid(src) {
+    const nodes = [], edges = [], stack = [];
+    for (const raw of src.replace(/\t/g, "  ").split("\n")) {
+      if (!raw.trim()) continue;
+      const lead = /^[\s│├└─|`]*/.exec(raw)[0];            // also accepts ASCII-art trees (├── child)
+      const label = raw.slice(lead.length).replace(/^[-*+]\s+/, "").trim();
+      if (!label) continue;
+      if (nodes.length === MAX_TREE_NODES) return null;
+      while (stack.length && stack[stack.length - 1].depth >= lead.length) stack.pop();
+      const id = "n" + nodes.length;
+      const empty = label === "-" || label === "∅";
+      nodes.push(empty ? `${id}[" "]:::empty` : `${id}["${label.slice(0, 48).replace(/"/g, "#quot;")}"]`);
+      if (stack.length) edges.push(`${stack[stack.length - 1].id} --> ${id}`);
+      stack.push({ depth: lead.length, id });
+    }
+    if (!nodes.length) return null;
+    return ["flowchart TD", ...nodes, ...edges, "classDef empty fill:transparent,stroke:#626887,stroke-dasharray:3 3"].join("\n");
   }
 
   /* traces */
