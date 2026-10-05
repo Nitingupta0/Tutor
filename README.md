@@ -117,6 +117,12 @@ uvicorn main:app --reload    # open http://127.0.0.1:8000
 
 ![Hint mode](docs/hint.png)
 
+**Visual explanations**: a playable trace of binary search (the faded cells are already ruled out) and the recursion tree of `fib(5)`, as drawn by the live tutor:
+
+![Step-by-step binary search trace](docs/trace.png)
+
+![Recursion tree for fib(5)](docs/tree.png)
+
 ## Growing the corpus
 
 Everything goes through `ingest.py`, which accepts any folder of `.md`, `.txt` or `.rst` files. `--append` adds to the index instead of rebuilding it; re-ingesting a file replaces its old chunks.
