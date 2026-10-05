@@ -452,8 +452,10 @@ body.sb-open .sidebar { transform: none; visibility: visible; transition: transf
 .diagram-canvas svg { max-width: 100%; height: auto; }
 .visual-diagram.drawn .diagram-canvas svg { animation: rise .5s var(--ease); }
 
-.trace-scroll { overflow-x: auto; padding-bottom: 2px; }
-.trace-track { display: inline-block; position: relative; padding: 0 var(--cell); min-width: 100%; }
+/* Room above the cells so a lifted, glowing cell isn't clipped by the scroll box; the track is centred
+   (and still scrolls from its left edge when it is wider than the card). */
+.trace-scroll { overflow-x: auto; padding: 14px 0 2px; margin-top: -10px; text-align: center; }
+.trace-track { display: inline-block; position: relative; padding: 0 var(--cell); text-align: left; }
 .trace-cells { display: flex; }
 .cell { width: var(--cell); flex: none; padding: 0 2px; text-align: center; transition: opacity .3s; }
 .cell b { display: flex; align-items: center; justify-content: center; height: calc(var(--cell) + 2px); border-radius: 9px;
